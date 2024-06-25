@@ -1,39 +1,27 @@
 package io.hyperfoil.tools.horreum.it;
 
 import io.hyperfoil.tools.horreum.infra.common.SelfSignedCert;
+import io.quarkus.test.common.DevServicesContext;
 import io.quarkus.test.common.QuarkusTestResourceLifecycleManager;
 import org.jboss.logging.Logger;
 
+import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 
-import static io.hyperfoil.tools.horreum.infra.common.Const.DEFAULT_KC_ADMIN_PASSWORD;
-import static io.hyperfoil.tools.horreum.infra.common.Const.DEFAULT_KC_ADMIN_USERNAME;
-import static io.hyperfoil.tools.horreum.infra.common.Const.DEFAULT_KC_DB_PASSWORD;
-import static io.hyperfoil.tools.horreum.infra.common.Const.DEFAULT_KC_DB_USERNAME;
-import static io.hyperfoil.tools.horreum.infra.common.Const.DEFAULT_KEYCLOAK_NETWORK_ALIAS;
-import static io.hyperfoil.tools.horreum.infra.common.Const.DEFAULT_POSTGRES_NETWORK_ALIAS;
-import static io.hyperfoil.tools.horreum.infra.common.Const.HORREUM_DEV_KEYCLOAK_ADMIN_PASSWORD;
-import static io.hyperfoil.tools.horreum.infra.common.Const.HORREUM_DEV_KEYCLOAK_ADMIN_USERNAME;
-import static io.hyperfoil.tools.horreum.infra.common.Const.HORREUM_DEV_KEYCLOAK_DB_PASSWORD;
-import static io.hyperfoil.tools.horreum.infra.common.Const.HORREUM_DEV_KEYCLOAK_DB_USERNAME;
-import static io.hyperfoil.tools.horreum.infra.common.Const.HORREUM_DEV_KEYCLOAK_ENABLED;
-import static io.hyperfoil.tools.horreum.infra.common.Const.HORREUM_DEV_KEYCLOAK_IMAGE;
-import static io.hyperfoil.tools.horreum.infra.common.Const.HORREUM_DEV_KEYCLOAK_NETWORK_ALIAS;
-import static io.hyperfoil.tools.horreum.infra.common.Const.HORREUM_DEV_POSTGRES_ENABLED;
-import static io.hyperfoil.tools.horreum.infra.common.Const.HORREUM_DEV_POSTGRES_IMAGE;
-import static io.hyperfoil.tools.horreum.infra.common.Const.HORREUM_DEV_POSTGRES_NETWORK_ALIAS;
-import static io.hyperfoil.tools.horreum.infra.common.Const.HORREUM_DEV_POSTGRES_SSL_CERTIFICATE;
-import static io.hyperfoil.tools.horreum.infra.common.Const.HORREUM_DEV_POSTGRES_SSL_CERTIFICATE_KEY;
+import static io.hyperfoil.tools.horreum.infra.common.Const.*;
 import static io.hyperfoil.tools.horreum.infra.common.HorreumResources.startContainers;
 import static io.hyperfoil.tools.horreum.infra.common.HorreumResources.stopContainers;
 import static java.lang.System.getProperty;
 
-public class ItResource implements QuarkusTestResourceLifecycleManager {
+public class ItResource implements QuarkusTestResourceLifecycleManager, DevServicesContext.ContextAware {
 
     private static final Logger log = Logger.getLogger(ItResource.class);
     private static boolean started = false;
 
     public static String  HORREUM_BOOTSTRAP_PASSWORD = "horreum.secret";
+
+    private DevServicesContext devServicesContext;
 
     @Override
     public Map<String, String> start() {
@@ -68,7 +56,14 @@ public class ItResource implements QuarkusTestResourceLifecycleManager {
                             Map.entry(HORREUM_DEV_KEYCLOAK_ADMIN_PASSWORD, DEFAULT_KC_ADMIN_PASSWORD),
                             Map.entry("horreum.bootstrap.password", HORREUM_BOOTSTRAP_PASSWORD) // well known bootstrap password instead of a random one
                     );
-                    return startContainers(containerArgs);
+
+                    Map<String, String> result = new HashMap<>(startContainers(containerArgs));
+                    result.put("quarkus.datasource.jdbc.additional-jdbc-properties.sslmode", "require");
+
+//                    result.put("quarkus.datasource.jdbc.url", "jdbc:postgresql://172.17.0.1:5432/horreum");
+//                    result.put("quarkus.datasource.migration.jdbc.url", "jdbc:postgresql://172.17.0.1:5432/horreum");
+//                    result.put("horreum.keycloak.url", "http://172.17.0.1:8080/");
+                    return result;
                 } catch (Exception e){
                     log.fatal("Could not start Horreum services", e);
                     stopContainers();
@@ -90,9 +85,9 @@ public class ItResource implements QuarkusTestResourceLifecycleManager {
                 throw new RuntimeException(e);
             }
         }
-
     }
 
-
-
+    @Override public void setIntegrationTestContext(DevServicesContext context) {
+        devServicesContext = context;
+    }
 }

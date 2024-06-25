@@ -107,8 +107,8 @@ public class HorreumClientIT implements QuarkusTestBeforeTestExecutionCallback, 
         long now = System.currentTimeMillis();
         String ts = String.valueOf(now);
         JsonNode data = JsonNodeFactory.instance.objectNode()
-                .put("$schema", schema.uri)
-                .put("value", "foobar");
+                                                .put("$schema", schema.uri)
+                                                .put("value", "foobar");
         horreumClient.runService.addRunFromData(ts, ts, dummyTest.name, dummyTest.owner, Access.PUBLIC, null, schema.uri, null, data);
 
         int datasetId = -1;
@@ -147,11 +147,11 @@ public class HorreumClientIT implements QuarkusTestBeforeTestExecutionCallback, 
         String ts = String.valueOf(now);
 
         ArrayNode arrayNode = JsonNodeFactory.instance.arrayNode()
-                .add(JsonNodeFactory.instance.objectNode().put("key", "value1"))
-                .add(JsonNodeFactory.instance.objectNode().put("key", "value2"))
-                .add(JsonNodeFactory.instance.objectNode().put("key", "value3"));
+                                                      .add(JsonNodeFactory.instance.objectNode().put("key", "value1"))
+                                                      .add(JsonNodeFactory.instance.objectNode().put("key", "value2"))
+                                                      .add(JsonNodeFactory.instance.objectNode().put("key", "value3"));
         ObjectNode data = JsonNodeFactory.instance.objectNode()
-                .put("$schema", schema.uri);
+                                                  .put("$schema", schema.uri);
 
         data.putIfAbsent("samplesArray", arrayNode);
 
@@ -244,11 +244,11 @@ public class HorreumClientIT implements QuarkusTestBeforeTestExecutionCallback, 
             changeDetection.model = ChangeDetectionModelType.names.RELATIVE_DIFFERENCE;
 
             changeDetection.config = (ObjectNode) mapper.readTree("{" +
-                    "          \"window\": 1," +
-                    "          \"filter\": \"mean\"," +
-                    "          \"threshold\": 0.2," +
-                    "          \"minPrevious\": 5" +
-                    "        }");
+                                                                  "          \"window\": 1," +
+                                                                  "          \"filter\": \"mean\"," +
+                                                                  "          \"threshold\": 0.2," +
+                                                                  "          \"minPrevious\": 5" +
+                                                                  "        }");
             variable.changeDetection = new HashSet<>();
             variable.changeDetection.add(changeDetection);
 
@@ -276,10 +276,10 @@ public class HorreumClientIT implements QuarkusTestBeforeTestExecutionCallback, 
             experimentComparison.model = "relativeDifference";
             experimentComparison.variableId = variableList.get(0).id; //should only contain one variable
             experimentComparison.config = mapper.readValue("{" +
-                    "          \"maxBaselineDatasets\": 0," +
-                    "          \"threshold\": 0.1," +
-                    "          \"greaterBetter\": true" +
-                    "        }", ObjectNode.class);
+                                                           "          \"maxBaselineDatasets\": 0," +
+                                                           "          \"threshold\": 0.1," +
+                                                           "          \"greaterBetter\": true" +
+                                                           "        }", ObjectNode.class);
 
 
             experimentProfile.comparisons = Collections.singletonList(experimentComparison);

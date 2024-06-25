@@ -32,7 +32,6 @@
         <module>infra/horreum-dev-services</module>
         <module>infra/horreum-infra-common</module>
         <module>horreum-backend</module>
-        <module>horreum-integration-tests</module>
     </modules>
     <name>Horreum</name>
     <description>Performance results repository</description>
@@ -72,6 +71,7 @@
         <version.maven.compiler>3.13.0</version.maven.compiler>
         <version.maven.gpg>3.2.4</version.maven.gpg>
         <version.maven.install>3.1.2</version.maven.install>
+        <version.maven.dependency>3.7.1</version.maven.dependency>
         <version.maven.jar>3.4.2</version.maven.jar>
         <version.maven.javadoc>3.7.0</version.maven.javadoc>
         <version.maven.project-info-reports>3.6.1</version.maven.project-info-reports>
