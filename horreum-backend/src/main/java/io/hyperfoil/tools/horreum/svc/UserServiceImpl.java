@@ -1,6 +1,7 @@
 package io.hyperfoil.tools.horreum.svc;
 
 import io.hyperfoil.tools.horreum.api.internal.services.UserService;
+import io.hyperfoil.tools.horreum.entity.user.AuthenticationToken;
 import io.hyperfoil.tools.horreum.entity.user.UserInfo;
 import io.hyperfoil.tools.horreum.server.WithRoles;
 import io.hyperfoil.tools.horreum.svc.user.UserBackEnd;
@@ -46,7 +47,7 @@ public class UserServiceImpl implements UserService {
         return backend.get().info(usernames);
     }
 
-    // ideally we want to enforce these roles in some of the endpoints, but for now this has to be done in the code
+    // ideally we want to enforce these roles in some endpoints, but for now this has to be done in the code
     // @RolesAllowed({ Roles.ADMIN, Roles.MANAGER })
     @Override public void createUser(NewUser user) {
         validateNewUser(user);
@@ -73,20 +74,14 @@ public class UserServiceImpl implements UserService {
     @Transactional
     @WithRoles(extras = Roles.HORREUM_SYSTEM)
     @Override public String defaultTeam() {
-        UserInfo userInfo = UserInfo.findById(identity.getPrincipal().getName());
-        if (userInfo == null) {
-            throw ServiceException.notFound(format("User with username {0} not found", identity.getPrincipal().getName()));
-        }
+        UserInfo userInfo = currentUser();
         return userInfo.defaultTeam != null ? userInfo.defaultTeam : "";
     }
 
     @Transactional
     @WithRoles(addUsername = true)
     @Override public void setDefaultTeam(String unsafeTeam) {
-        UserInfo userInfo = UserInfo.findById(identity.getPrincipal().getName());
-        if (userInfo == null) {
-            throw ServiceException.notFound(format("User with username {0} not found", identity.getPrincipal().getName()));
-        }
+        UserInfo userInfo = currentUser();
         userInfo.defaultTeam = validateTeamName(unsafeTeam);
         userInfo.persistAndFlush();
     }
@@ -165,12 +160,8 @@ public class UserServiceImpl implements UserService {
         if (backend.get().machineAccounts(team).stream().noneMatch(data -> data.username.equals(username))) {
             throw ServiceException.badRequest(format("User {0} is not machine account of team {1}", username, team));
         }
-        UserInfo userInfo = UserInfo.findById(username);
-        if (userInfo == null) {
-            throw ServiceException.notFound(format("User with username {0} not found", username));
-        }
         String newPassword = new SecureRandom().ints(RANDOM_PASSWORD_LENGTH, '0', 'z' + 1).collect(StringBuilder::new, StringBuilder::appendCodePoint, StringBuilder::append).toString();
-        userInfo.setPassword(newPassword);
+        UserInfo.<UserInfo>findByIdOptional(username).orElseThrow(() -> ServiceException.notFound(format("User with username {0} not found", username))).setPassword(newPassword);
         Log.infov("{0} reset password of user {1}", identity.getPrincipal().getName(), username);
         return newPassword;
     }
@@ -243,6 +234,42 @@ public class UserServiceImpl implements UserService {
         } catch (Exception e) {
             // ignore
         }
+    }
+
+    // --- //
+
+    @Transactional
+    @WithRoles(addUsername = true)
+    @Override public String newAuthenticationToken(HorreumAuthenticationTokenRequest tokenRequest) {
+        if (tokenRequest.expiration < -1) { // allow creating a token for yesterday for testing
+            throw ServiceException.badRequest("Token expiration time is negative");
+        }
+        UserInfo userInfo = currentUser();
+
+        AuthenticationToken authToken = new AuthenticationToken(tokenRequest.name, tokenRequest.expiration);
+        authToken.user = userInfo;
+        userInfo.authenticationTokens.add(authToken);
+        authToken.persist();
+        userInfo.persist();
+
+        Log.infov("User {0} created authentication token {1} valid for {2} days", identity.getPrincipal().getName(), tokenRequest.name, tokenRequest.expiration);
+        return authToken.getToken();
+    }
+
+    @Transactional
+    @WithRoles(extras = Roles.HORREUM_SYSTEM)
+    @Override public List<HorreumAuthenticationToken> authenticationTokens() {
+        return currentUser().authenticationTokens.stream().map(AuthenticationToken::toHorreumAuthenticationToken).toList();
+    }
+
+    @Transactional
+    @WithRoles(addUsername = true)
+    @Override public void revokeAuthenticationToken(long tokenId) {
+        AuthenticationToken.<AuthenticationToken>findByIdOptional(tokenId).orElseThrow(() -> ServiceException.notFound(format("Token with id {0} not found", tokenId))).revoke();
+    }
+
+    private UserInfo currentUser() {
+        return UserInfo.<UserInfo>findByIdOptional(identity.getPrincipal().getName()).orElseThrow(() -> ServiceException.notFound(format("User with username {0} not found", identity.getPrincipal().getName())));
     }
 
     // --- //

@@ -67,12 +67,17 @@ public class UserInfo extends PanacheEntityBase {
     @Cache(usage = CacheConcurrencyStrategy.READ_ONLY)
     public Set<TeamMembership> teams;
 
+    @OneToMany(fetch = FetchType.EAGER, cascade = CascadeType.ALL, mappedBy = "user")
+    @Cache(usage = CacheConcurrencyStrategy.READ_ONLY)
+    public Set<AuthenticationToken> authenticationTokens;
+
     public UserInfo() {}
 
     public UserInfo(String username) {
         this.username = username;
         this.roles = new HashSet<>();
         this.teams = new HashSet<>();
+        this.authenticationTokens = new HashSet<>();
     }
 
     public void setPassword(String clearPassword) {

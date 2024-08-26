@@ -1,5 +1,6 @@
 package io.hyperfoil.tools.horreum.api.internal.services;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 
@@ -8,6 +9,7 @@ import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.DELETE;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.POST;
+import jakarta.ws.rs.PUT;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
@@ -116,6 +118,22 @@ public interface UserService {
    @Blocking
    String resetPassword(@PathParam("team") String team, @RequestBody(required = true) String username);
 
+   @POST
+   @Path("/token")
+   @Produces("text/plain")
+   @Blocking
+   String newAuthenticationToken(@RequestBody HorreumAuthenticationTokenRequest tokenRequest);
+
+   @GET
+   @Path("/token")
+   @Blocking
+   List<HorreumAuthenticationToken> authenticationTokens();
+
+   @PUT
+   @Path("/token/{id}/revoke")
+   @Blocking
+   void revokeAuthenticationToken(@PathParam("id") long tokenId);
+
    // this is a simplified copy of org.keycloak.representations.idm.UserRepresentation
    class UserData {
       @NotNull
@@ -143,5 +161,28 @@ public interface UserService {
       public String password;
       public String team;
       public List<String> roles;
+   }
+
+   // --- //
+
+   class HorreumAuthenticationTokenRequest {
+      public String name;
+      public long expiration;
+
+      public HorreumAuthenticationTokenRequest() {
+      }
+
+      public HorreumAuthenticationTokenRequest(String name, long expiration) {
+         this.name = name;
+         this.expiration = expiration;
+      }
+   }
+
+   class HorreumAuthenticationToken {
+      public long id;
+      public String name;
+      public LocalDate dateExpired;
+      public boolean isExpired;
+      public boolean isRevoked;
    }
 }

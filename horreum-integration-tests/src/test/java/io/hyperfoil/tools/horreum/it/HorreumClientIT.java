@@ -35,9 +35,10 @@ import io.quarkus.test.junit.callback.QuarkusTestBeforeEachCallback;
 import io.quarkus.test.junit.callback.QuarkusTestBeforeTestExecutionCallback;
 import io.quarkus.test.junit.callback.QuarkusTestContext;
 import io.quarkus.test.junit.callback.QuarkusTestMethodContext;
+import jakarta.ws.rs.BadRequestException;
+import jakarta.ws.rs.NotAuthorizedException;
 import org.junit.jupiter.api.Assertions;
 
-import jakarta.ws.rs.BadRequestException;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
@@ -51,13 +52,38 @@ import java.util.List;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 @QuarkusIntegrationTest
 @TestProfile(InContainerProfile.class)
 public class HorreumClientIT implements QuarkusTestBeforeTestExecutionCallback, QuarkusTestBeforeClassCallback, QuarkusTestBeforeEachCallback, QuarkusTestAfterEachCallback, QuarkusTestAfterAllCallback {
+
+    @org.junit.jupiter.api.Test
+    public void testAuthenticationToken() {
+        String theToken = horreumClient.userService.newAuthenticationToken(new UserService.HorreumAuthenticationTokenRequest("Test token", 10));
+
+        try (HorreumClient tokenClient = new HorreumClient.Builder()
+                .horreumUrl("http://localhost:".concat(System.getProperty("quarkus.http.test-port")))
+                .horreumAuthenticationToken(theToken)
+                .build()) {
+
+            assertFalse(tokenClient.userService.getRoles().isEmpty());
+            assertTrue(tokenClient.userService.getRoles().contains(TEST_TEAM.replace("team", Roles.TESTER)));
+
+            UserService.HorreumAuthenticationToken horreumToken = horreumClient.userService.authenticationTokens().get(0);
+
+            assertFalse(horreumToken.isRevoked);
+            assertFalse(horreumToken.isExpired);
+
+            horreumClient.userService.revokeAuthenticationToken(horreumToken.id);
+
+            assertThrows(NotAuthorizedException.class, () -> tokenClient.userService.getRoles().isEmpty());
+        }
+    }
 
     @org.junit.jupiter.api.Test
     public void testAddRunFromData() throws JsonProcessingException {

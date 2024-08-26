@@ -78,6 +78,10 @@ public class KeycloakUserBackend implements UserBackEnd {
         }
     }
 
+    @Override public List<String> getRoles(String username) {
+        return keycloak.realm(realm).users().get(findMatchingUser(username).getId()).roles().realmLevel().listAll().stream().map(RoleRepresentation::getName).toList();
+    }
+
     @Override public List<UserService.UserData> info(List<String> usernames) {
         List<UserService.UserData> users = new ArrayList<>();
         for (String username : usernames) {
@@ -111,15 +115,9 @@ public class KeycloakUserBackend implements UserBackEnd {
             throw ServiceException.serverError(format("Failed to create new user {0}", rep.getUsername()));
         }
 
-        try {  // assign the provided roles to the realm
+        try { // assign the provided roles to the realm
             UsersResource usersResource = keycloak.realm(realm).users();
-            List<UserRepresentation> matchingUsers = usersResource.search(rep.getUsername(), true);
-            if (matchingUsers == null || matchingUsers.isEmpty()) {
-                throw ServiceException.badRequest(format("User {0} does not exist", rep.getUsername()));
-            } else if (matchingUsers.size() > 1) {
-                throw ServiceException.serverError(format("More than one user with username {0}", rep.getUsername()));
-            }
-            String userId = matchingUsers.get(0).getId();
+            String userId = findMatchingUser(rep.getUsername()).getId();
 
             if (user.team != null) {
                 String prefix = getTeamPrefix(user.team);
@@ -152,7 +150,7 @@ public class KeycloakUserBackend implements UserBackEnd {
     }
 
     @Override public void removeUser(String username) {
-        try (Response response = keycloak.realm(realm).users().delete(findMatchingUserId(username))) {
+        try (Response response = keycloak.realm(realm).users().delete(findMatchingUser(username).getId())) {
             if (response.getStatusInfo().getFamily() != Response.Status.Family.SUCCESSFUL) {
                 LOG.warnv("Got {0} response for removing user {0}", response.getStatusInfo(), username);
                 throw ServiceException.serverError(format("Unable to remove user {0}", username));
@@ -189,7 +187,7 @@ public class KeycloakUserBackend implements UserBackEnd {
         }
     }
 
-    private String findMatchingUserId(String username) { // find the clientID of a single user
+    private UserRepresentation findMatchingUser(String username) { // find the clientID of a single user
         List<UserRepresentation> matchingUsers = keycloak.realm(realm).users().search(username, true);
         if (matchingUsers == null || matchingUsers.isEmpty()) {
             LOG.warnv("Cannot find user with username {0}", username);
@@ -198,7 +196,7 @@ public class KeycloakUserBackend implements UserBackEnd {
             LOG.warnv("Multiple matches for exact search for username {0}: {1}", username, matchingUsers.stream().map(UserRepresentation::getId).collect(joining(" ")));
             throw ServiceException.serverError(format("More than one user with username {0}", username));
         }
-        return matchingUsers.get(0).getId();
+        return matchingUsers.get(0);
     }
 
     @Override public Map<String, List<String>> teamMembers(String team) { // get a list of members of a team and their "UI roles"
@@ -225,7 +223,7 @@ public class KeycloakUserBackend implements UserBackEnd {
             RoleMappingResource rolesMappingResource;
 
             try { // fetch the current roles for the user
-                String userId = findMatchingUserId(entry.getKey());
+                String userId = findMatchingUser(entry.getKey()).getId();
                 rolesMappingResource = keycloak.realm(realm).users().get(userId).roles();
                 existingRoles = rolesMappingResource.getAll().getRealmMappings().stream().map(RoleRepresentation::getName).toList();
             } catch (Throwable t) {
@@ -359,7 +357,7 @@ public class KeycloakUserBackend implements UserBackEnd {
             for (String username : newAdmins) { // add admin role for `newAdmins` not in `oldAdmins`
                 if (oldAdmins.stream().noneMatch(old -> username.equals(old.getUsername()))) {
                     try {
-                        usersResource.get(findMatchingUserId(username)).roles().realmLevel().add(List.of(adminRole));
+                        usersResource.get(findMatchingUser(username).getId()).roles().realmLevel().add(List.of(adminRole));
                         LOG.infov("Added administrator role to user {0}", username);
                     } catch (Throwable t) {
                         LOG.warnv("Could not add admin role to user {0} due to {1}", username, t.getMessage());
@@ -390,7 +388,7 @@ public class KeycloakUserBackend implements UserBackEnd {
             credentials.setType(CredentialRepresentation.PASSWORD);
             credentials.setValue(password);
 
-            keycloak.realm(realm).users().get(findMatchingUserId(username)).resetPassword(credentials);
+            keycloak.realm(realm).users().get(findMatchingUser(username).getId()).resetPassword(credentials);
         } catch (Throwable t) {
             LOG.warnv(t, "Failed to retrieve current representation of user {0} from Keycloak", username);
             throw ServiceException.serverError(format("Failed to retrieve current representation of user {0} from Keycloak", username));

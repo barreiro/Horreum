@@ -49,7 +49,7 @@ public abstract class UserServiceAbstractTest {
 
     @Inject Instance<UserBackEnd> backend;
 
-    @Inject SecurityBootstrap securitiyBootstrap;
+    @Inject SecurityBootstrap securityBootstrap;
 
     /**
      * Runs a section of a test under a different user
@@ -524,7 +524,52 @@ public abstract class UserServiceAbstractTest {
         backend.get().updateAdministrators(List.of()); // call the backend directly to be able to remove *ALL* administrators
         assertTrue(userService.administrators().isEmpty());
 
-        securitiyBootstrap.checkBootstrapAccount();
+        securityBootstrap.checkBootstrapAccount();
         assertTrue(userService.administrators().stream().map(userData -> userData.username).anyMatch("horreum.bootstrap"::equals), "Bootstrap account missing");
     }
+
+    @TestSecurity(user = KEYCLOAK_ADMIN, roles = { Roles.ADMIN })
+    @Test void authenticationTokens() {
+        String testTeam = "auth-token-test-team", authTokenUser = "token-user";
+        userService.addTeam(testTeam);
+
+        // add a user to the team
+        UserService.NewUser user = new UserService.NewUser();
+        user.user = new UserService.UserData("", authTokenUser, "Auth Token", "User", "token@horreum.io");
+        user.password = "whatever";
+        user.team = testTeam;
+        user.roles = List.of(Roles.MANAGER);
+        userService.createUser(user);
+
+        overrideTestSecurity(authTokenUser, Set.of(Roles.MANAGER, testTeam.substring(0, testTeam.length() - 4) + Roles.MANAGER), () -> {
+            assertTrue(userService.authenticationTokens().isEmpty());
+
+            // create token
+            String token = userService.newAuthenticationToken(new UserService.HorreumAuthenticationTokenRequest("Test token", 10));
+            assertFalse(token.length() < 32); // token should be big enough
+
+            // one token
+            List <UserService.HorreumAuthenticationToken> tokens = userService.authenticationTokens();
+            assertEquals(1, tokens.size());
+            assertFalse(tokens.get(0).isExpired);
+            assertFalse(tokens.get(0).isRevoked);
+
+            // revoke token
+            userService.revokeAuthenticationToken(tokens.get(0).id);
+            assertTrue(userService.authenticationTokens().get(0).isRevoked);
+
+            // create token
+            String expiredToken = userService.newAuthenticationToken(new UserService.HorreumAuthenticationTokenRequest("Expired token", -1));
+            assertFalse(expiredToken.length() < 32); // token should be big enough
+
+            // one expired token
+            List <UserService.HorreumAuthenticationToken> twoTokens = userService.authenticationTokens();
+            assertEquals(2, twoTokens.size());
+            assertTrue(twoTokens.stream().anyMatch(t -> t.isExpired));
+
+            // a token deep in the past
+            assertThrows(ServiceException.class, () -> userService.newAuthenticationToken(new UserService.HorreumAuthenticationTokenRequest("Very old token", -10)));
+        });
+    }
+
 }

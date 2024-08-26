@@ -4566,4 +4566,30 @@
             CREATE INDEX idx_label_metrics_partial ON label (id) WHERE metrics = TRUE;
         </sql>
     </changeSet>
+    <changeSet id="123" author="barreiro">
+        <validCheckSum>ANY</validCheckSum>
+        <createSequence sequenceName="userinfo_token_id_seq" startValue="1" incrementBy="1" cacheSize="1" />
+        <createTable tableName="userinfo_token">
+            <column name="id" type="integer"/>
+            <column name="token" type="uuid">
+                <constraints nullable="false" primaryKey="true"/>
+            </column>
+            <column name="username" type="text">
+                <constraints nullable="false"/>
+            </column>
+            <column name="name" type="text"/>
+            <column name="revoked" type="bool"/>
+            <column name="date_expired" type="date"/>
+        </createTable>
+        <addForeignKeyConstraint constraintName="fk_userinfo_token"
+                                 baseTableName="userinfo_token" baseColumnNames="username"
+                                 referencedTableName="userinfo" referencedColumnNames="username"/>
+        <sql>
+            GRANT SELECT, INSERT, DELETE, UPDATE ON TABLE userinfo_token TO "${quarkus.datasource.username}";
+            GRANT ALL ON SEQUENCE userinfo_token_id_seq TO "${quarkus.datasource.username}";
+            ALTER TABLE userinfo_token ENABLE ROW LEVEL SECURITY;
+            CREATE POLICY userinfo_token_read ON userinfo_token USING (has_role('horreum.system'));
+            CREATE POLICY userinfo_token_rw ON userinfo_token FOR ALL USING (has_role(username));
+        </sql>
+    </changeSet>
 </databaseChangeLog>

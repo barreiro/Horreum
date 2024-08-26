@@ -48,6 +48,17 @@ public class DatabaseUserBackend implements UserBackEnd {
     }
 
     @Transactional
+    @Override public List<String> getRoles(String username) {
+        UserInfo user = UserInfo.findById(username);
+        List<String> roles = new ArrayList<>();
+        user.roles.stream().map(UserRole::toString).map(String::toLowerCase).forEach(roles::add);
+        user.teams.stream().map(TeamMembership::asRole).forEach(roles::add);
+        user.teams.stream().map(TeamMembership::asTeam).forEach(roles::add);
+        user.teams.stream().map(TeamMembership::asUIRole).distinct().forEach(roles::add);
+        return roles;
+    }
+
+    @Transactional
     @WithRoles(extras = Roles.HORREUM_SYSTEM)
     @Override public List<UserService.UserData> searchUsers(String query) {
         List<UserInfo> users = UserInfo.list("lower(firstName) like ?1 or lower(lastName) like ?1 or lower(username) like ?1", "%" + query.toLowerCase() + "%");
