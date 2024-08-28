@@ -21,8 +21,10 @@ import {
     Form,
     FormGroup,
     PageSection,
-    Spinner, EmptyStateHeader,
-    } from "@patternfly/react-core"
+    Spinner, 
+    EmptyStateHeader,
+    Tab,
+} from "@patternfly/react-core"
 
 import { UserIcon } from "@patternfly/react-icons"
 
@@ -33,6 +35,7 @@ import ManagedTeams from "./ManagedTeams"
 import {AppContext} from "../../context/appContext";
 import {AppContextType} from "../../context/@types/appContextTypes";
 import ManageMachineAccounts from "./MachineAccounts";
+import AuthenticationTokens from "./AuthentcationTokens";
 
 
 export const UserProfileLink = () => {
@@ -109,7 +112,7 @@ export function UserSettings() {
                     <SavedTabs
                         afterSave={() => {
                             setModified(false)
-                            alerting.dispatchInfo("SAVE", "Saved!", "User settings succesfully updated!", 3000)
+                            alerting.dispatchInfo("SAVE", "Saved!", "User settings successfully updated!", 3000)
                         }}
                         afterReset={() => setModified(false)}
                     >
@@ -158,7 +161,7 @@ export function UserSettings() {
                             />
                         </SavedTab>
                         <SavedTab
-                            title="Team-notifications"
+                            title="Team notifications"
                             fragment="team-notifications"
                             canSave={true}
                             onSave={() => {
@@ -209,6 +212,9 @@ export function UserSettings() {
                                 </EmptyState>
                             )}
                         </SavedTab>
+                        <Tab title="Authentication tokens" eventKey="authentication-tokens">
+                            <AuthenticationTokens/>
+                        </Tab>
                         {managedTeams.length > 0 ? (
                             <SavedTab
                                 title="Managed teams"

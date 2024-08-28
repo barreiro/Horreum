@@ -241,8 +241,10 @@ public class UserServiceImpl implements UserService {
     @Transactional
     @WithRoles(addUsername = true)
     @Override public String newAuthenticationToken(HorreumAuthenticationTokenRequest tokenRequest) {
-        if (tokenRequest.expiration < -1) { // allow creating a token for yesterday for testing
+        if (tokenRequest.expiration < -1) { // allow creating a token for yesterday for testing purposes
             throw ServiceException.badRequest("Token expiration time is negative");
+        } else if (tokenRequest.expiration > 1000) {
+            throw ServiceException.badRequest("Token expiration time is too long");
         }
         UserInfo userInfo = currentUser();
 
