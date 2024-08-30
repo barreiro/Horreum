@@ -5,6 +5,8 @@ import {
     DatePicker,
     Form,
     FormGroup,
+    HelperText,
+    HelperTextItem,
     Label,
     Modal,
     NumberInput,
@@ -100,7 +102,7 @@ export default function AuthenticationTokens() {
                     <Tr>
                         <Th label="name">Token Name</Th>
                         <Th label="status">Status</Th>
-                        <Th label="expiration">Expiration</Th>
+                        <Th label="expiration">Expiration date</Th>
                     </Tr>
                 </Thead>
                 <Tbody>
@@ -110,7 +112,7 @@ export default function AuthenticationTokens() {
                             <Td dataLabel="status">{tokenStatus(token)}</Td>
                             <Td dataLabel="expiration">
                                 <Tooltip content={tokenExpirationTooltip(token)}>
-                                    <>{token.dateExpired?.toLocaleDateString() || "undefined"}</>
+                                    <span>{token.dateExpired?.toLocaleDateString() || "undefined"}</span>
                                 </Tooltip>
                             </Td>
                             <Td isActionCell>
@@ -187,6 +189,11 @@ export default function AuthenticationTokens() {
             <Modal
                 isOpen={newAuthenticationTokenValue != undefined}
                 title={`New token: ${newTokenName}`}
+                footer={
+                    <HelperText>
+                        <HelperTextItem variant="warning" hasIcon>This is the only time you'll be able to see the token</HelperTextItem>
+                    </HelperText>
+                }
                 aria-label="new-authentication-token"
                 variant="small"
                 onClose={() => setNewAuthenticationTokenValue(undefined)}>

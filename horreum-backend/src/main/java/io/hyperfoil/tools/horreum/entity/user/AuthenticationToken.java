@@ -91,11 +91,12 @@ public class AuthenticationToken extends PanacheEntityBase {
 
     public void revoke() {
         revoked = true;
+        dateExpired = LocalDate.now();
     }
 
     public void renew(long days) {
         if (isLocked()) {
-            throw new IllegalStateException("Token is expired and cannot be renewed");
+            throw new IllegalStateException("Token has expired and cannot be renewed");
         }
         dateExpired = LocalDate.now().plusDays(days);
     }
