@@ -7,6 +7,7 @@ import {
     FormGroup,
     Label,
     Modal,
+    NumberInput,
     TextInput,
     Tooltip,
     yyyyMMddFormat,
@@ -23,18 +24,19 @@ export default function AuthenticationTokens() {
     const daysTo = (other: Date) => Math.ceil((other.getTime() - Date.now()) / (24 * 3600 * 1000))
     const defaultExpiration = () => yyyyMMddFormat(new Date(Date.now() + 400 * 24 * 3600 * 1000)) // default 400 days
 
-    const refreshTokens = () =>
-        userApi.authenticationTokens().then(
-            users => setAuthenticationTokens(users),
-            error => alerting.dispatchError(error, "FETCH_AUTHENTICATION_TOKEN", "Failed to fetch authentication tokens for user")
-        )
-
     const [authenticationTokens, setAuthenticationTokens] = useState<HorreumAuthenticationToken[]>([])
-    const [createNewToken, setCreateNewToken] = useState(false)
-    const [newAuthenticationTokenValue, setNewAuthenticationTokenValue] = useState<string>()
+    const refreshTokens = () => userApi.authenticationTokens().then(
+        users => setAuthenticationTokens(users),
+        error => alerting.dispatchError(error, "FETCH_AUTHENTICATION_TOKEN", "Failed to fetch authentication tokens for user")
+    )
 
+    const [createNewToken, setCreateNewToken] = useState(false)
     const [newTokenName, setNewTokenName] = useState<string>()
     const [newTokenExpiration, setNewTokenExpiration] = useState<string>(defaultExpiration)
+    const [newAuthenticationTokenValue, setNewAuthenticationTokenValue] = useState<string>()
+
+    const [renewTokenId, setRenewTokenId] = useState<number>()
+    const [renewTokenExpiration, setRenewTokenExpiration] = useState<number>(90)
 
     const rangeValidator = (date: Date) => {
         const days = daysTo(date);
@@ -61,7 +63,10 @@ export default function AuthenticationTokens() {
             const d = daysTo(token.dateExpired)
             if (d < 1) {
                 return <Label color="orange">Expires TODAY</Label>
-            } else if (d < 7) {
+            } else if (d < 2) {
+                return <Label color="orange">Expires TOMORROW</Label>
+            }
+            if (d < 7) {
                 return <Label color="gold">Expires in less than a week</Label>
             } else if (d < 30) {
                 return <Label color="green">Expires in less than a month</Label>
@@ -70,7 +75,7 @@ export default function AuthenticationTokens() {
         return <></>
     }
 
-    const tokenTooltip = (token: HorreumAuthenticationToken) => {
+    const tokenExpirationTooltip = (token: HorreumAuthenticationToken) => {
         if (token.isExpired) {
             return "Token has expired"
         } else if (token.dateExpired) {
@@ -99,17 +104,25 @@ export default function AuthenticationTokens() {
                     </Tr>
                 </Thead>
                 <Tbody>
-                    {authenticationTokens.filter(token => daysTo(token.dateExpired ?? new Date()) >= -30).map((token, i) => ( // filter tokens that expired over 30 days
-                        <Tr key={"token-" + i}>
+                    {authenticationTokens.map((token, i) => (
+                        <Tr key={`token-${i}`}>
                             <Td dataLabel="name">{token.name}</Td>
                             <Td dataLabel="status">{tokenStatus(token)}</Td>
                             <Td dataLabel="expiration">
-                                <Tooltip content={tokenTooltip(token)}><span
-                                    id={"authentication-token-expired-" + i}>{token.dateExpired?.toLocaleDateString()}</span>
+                                <Tooltip content={tokenExpirationTooltip(token)}>
+                                    <>{token.dateExpired?.toLocaleDateString() || "undefined"}</>
                                 </Tooltip>
                             </Td>
                             <Td isActionCell>
-                                <ActionsColumn items={[
+                                <ActionsColumn items={token.isRevoked ? [] : [
+                                    {
+                                        title: 'Renew',
+                                        isDisabled: !(token.dateExpired && daysTo(token.dateExpired) < 7), // only allow to renew in last 7 days
+                                        onClick: () => {
+                                            setRenewTokenExpiration(90)
+                                            setRenewTokenId(token.id)
+                                        }
+                                    },
                                     {
                                         title: 'Revoke',
                                         onClick: () => {
@@ -144,12 +157,7 @@ export default function AuthenticationTokens() {
                             })
                                 .then((tokenValue) => {
                                     setNewAuthenticationTokenValue(tokenValue)
-                                    void alerting.dispatchInfo(
-                                        "TOKEN_CREATED",
-                                        "Authentication token created",
-                                        "Authentication token was successfully created",
-                                        3000
-                                    )
+                                    void alerting.dispatchInfo("TOKEN_CREATED", "Authentication token created", "Authentication token was successfully created", 3000)
                                 })
                                 .catch(error => alerting.dispatchError(error, "TOKEN_NOT_CREATED", "Failed to create new authentication token"))
                                 .finally(() => setCreateNewToken(false))
@@ -179,10 +187,48 @@ export default function AuthenticationTokens() {
             <Modal
                 isOpen={newAuthenticationTokenValue != undefined}
                 title={`New token: ${newTokenName}`}
-                aria-label="New authentication token"
+                aria-label="new-authentication-token"
                 variant="small"
                 onClose={() => setNewAuthenticationTokenValue(undefined)}>
                 <ClipboardCopy isReadOnly>{newAuthenticationTokenValue}</ClipboardCopy>
+            </Modal>
+            <Modal
+                isOpen={renewTokenId != undefined}
+                title={`Renew token`}
+                aria-label="renew-authentication-token"
+                variant="small"
+                onClose={() => setNewAuthenticationTokenValue(undefined)}
+                actions={[
+                    <Button
+                        onClick={() => {
+                            if (renewTokenId) {
+                                userApi.renewAuthenticationToken(renewTokenId, renewTokenExpiration)
+                                    .then(() => void alerting.dispatchInfo("TOKEN_RENEWED", "Authentication token renewed", "Authentication token was successfully renewed", 3000))
+                                    .catch(error => alerting.dispatchError(error, "TOKEN_NOT_RENEWED", "Failed to renew authentication token"))
+                                    .finally(() => setRenewTokenId(undefined))
+                                    .then(() => void refreshTokens())
+                            }
+                        }}
+                    >
+                        Renew
+                    </Button>,
+                    <Button variant="secondary" onClick={() => setRenewTokenId(undefined)}>Cancel</Button>,
+                ]}>
+                <Form isHorizontal>
+                    <FormGroup isRequired label="Days to expiration" fieldId="renew-authentication-token-expiration">
+                        <NumberInput
+                            value={renewTokenExpiration}
+                            min={0}
+                            max={100}
+                            onMinus={() => setRenewTokenExpiration(renewTokenExpiration - 1)}
+                            onPlus={() => setRenewTokenExpiration(renewTokenExpiration + 1)}
+                            onChange={(event) => {
+                                const value = (event.target as HTMLInputElement).value;
+                                setRenewTokenExpiration(value === '' ? 0 : +value);
+                            }}
+                        />
+                    </FormGroup>
+                </Form>
             </Modal>
         </>
     )

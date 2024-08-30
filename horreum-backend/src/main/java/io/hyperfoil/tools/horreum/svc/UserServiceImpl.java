@@ -15,6 +15,7 @@ import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
 
 import java.security.SecureRandom;
+import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -161,7 +162,7 @@ public class UserServiceImpl implements UserService {
             throw ServiceException.badRequest(format("User {0} is not machine account of team {1}", username, team));
         }
         String newPassword = new SecureRandom().ints(RANDOM_PASSWORD_LENGTH, '0', 'z' + 1).collect(StringBuilder::new, StringBuilder::appendCodePoint, StringBuilder::append).toString();
-        UserInfo.<UserInfo>findByIdOptional(username).orElseThrow(() -> ServiceException.notFound(format("User with username {0} not found", username))).setPassword(newPassword);
+        UserInfo.<UserInfo>findByIdOptional(username).orElseThrow(() -> ServiceException.notFound(format("Username {0} not found", username))).setPassword(newPassword);
         Log.infov("{0} reset password of user {1}", identity.getPrincipal().getName(), username);
         return newPassword;
     }
@@ -254,24 +255,43 @@ public class UserServiceImpl implements UserService {
         authToken.persist();
         userInfo.persist();
 
-        Log.infov("User {0} created authentication token {1} valid for {2} days", identity.getPrincipal().getName(), tokenRequest.name, tokenRequest.expiration);
+        Log.infov("{0} created authentication token {1} valid until {2}", identity.getPrincipal().getName(), tokenRequest.name, LocalDate.now().plusDays(tokenRequest.expiration));
         return authToken.getToken();
     }
 
     @Transactional
     @WithRoles(extras = Roles.HORREUM_SYSTEM)
     @Override public List<HorreumAuthenticationToken> authenticationTokens() {
-        return currentUser().authenticationTokens.stream().map(AuthenticationToken::toHorreumAuthenticationToken).toList();
+        return currentUser().authenticationTokens.stream()
+                                                 .filter(t -> !t.isLocked())
+                                                 .sorted((a, b) -> (int) (a.daysToExpiration() - b.daysToExpiration()))
+                                                 .map(AuthenticationToken::toHorreumAuthenticationToken)
+                                                 .toList();
     }
 
     @Transactional
     @WithRoles(addUsername = true)
     @Override public void revokeAuthenticationToken(long tokenId) {
-        AuthenticationToken.<AuthenticationToken>findByIdOptional(tokenId).orElseThrow(() -> ServiceException.notFound(format("Token with id {0} not found", tokenId))).revoke();
+        AuthenticationToken token = AuthenticationToken.<AuthenticationToken>findByIdOptional(tokenId).orElseThrow(() -> ServiceException.notFound(format("Token with id {0} not found", tokenId)));
+        token.revoke();
+        Log.infov("{0} revoked authentication token {1}", identity.getPrincipal().getName(), token.getName());
+    }
+
+    @Transactional
+    @WithRoles(addUsername = true)
+    @Override public void renewAuthenticationToken(long tokenId, long expiration) {
+        if (expiration < 0) {
+            throw ServiceException.badRequest("Token expiration time is negative");
+        } else if (expiration > 100) {
+            throw ServiceException.badRequest("Token expiration time is too long");
+        }
+        AuthenticationToken token = AuthenticationToken.<AuthenticationToken>findByIdOptional(tokenId).orElseThrow(() -> ServiceException.notFound(format("Token with id {0} not found", tokenId)));
+        token.renew(expiration);
+        Log.infov("{0} renewed authentication token {1} until {2}", identity.getPrincipal().getName(), token.getName(), LocalDate.now().plusDays(expiration));
     }
 
     private UserInfo currentUser() {
-        return UserInfo.<UserInfo>findByIdOptional(identity.getPrincipal().getName()).orElseThrow(() -> ServiceException.notFound(format("User with username {0} not found", identity.getPrincipal().getName())));
+        return UserInfo.<UserInfo>findByIdOptional(identity.getPrincipal().getName()).orElseThrow(() -> ServiceException.notFound(format("Username {0} not found", identity.getPrincipal().getName())));
     }
 
     // --- //

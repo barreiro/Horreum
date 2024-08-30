@@ -21,7 +21,8 @@ import static jakarta.persistence.GenerationType.SEQUENCE;
 @Entity(name = "userinfo_token")
 public class AuthenticationToken extends PanacheEntityBase {
 
-    public static long DEFAULT_EXPIRATION_DAYS = 400;
+    // locked authentication tokens are not listed and can't be renewed either
+    public static long DEFAULT_EXPIRATION_DAYS = 400, LOCKED_EXPIRATION_DAYS = 7;
 
     @Id
     @SequenceGenerator(
@@ -42,7 +43,7 @@ public class AuthenticationToken extends PanacheEntityBase {
     private final String name;
 
     @Column(name = "date_expired")
-    private final LocalDate dateExpired;
+    private LocalDate dateExpired;
     private boolean revoked;
 
     public AuthenticationToken() {
@@ -68,6 +69,10 @@ public class AuthenticationToken extends PanacheEntityBase {
         return token.toString();
     }
 
+    public boolean isLocked() {
+        return dateExpired.plusDays(LOCKED_EXPIRATION_DAYS).isBefore(LocalDate.now());
+    }
+
     public boolean isExpired() {
         return LocalDate.now().isAfter(dateExpired);
     }
@@ -86,6 +91,13 @@ public class AuthenticationToken extends PanacheEntityBase {
 
     public void revoke() {
         revoked = true;
+    }
+
+    public void renew(long days) {
+        if (isLocked()) {
+            throw new IllegalStateException("Token is expired and cannot be renewed");
+        }
+        dateExpired = LocalDate.now().plusDays(days);
     }
 
     @Override public boolean equals(Object o) {

@@ -134,6 +134,11 @@ public interface UserService {
    @Blocking
    void revokeAuthenticationToken(@PathParam("id") long tokenId);
 
+   @PUT
+   @Path("/token/{id}/renew")
+   @Blocking
+   void renewAuthenticationToken(@PathParam("id") long tokenId, @RequestBody long expiration);
+
    // this is a simplified copy of org.keycloak.representations.idm.UserRepresentation
    class UserData {
       @NotNull
