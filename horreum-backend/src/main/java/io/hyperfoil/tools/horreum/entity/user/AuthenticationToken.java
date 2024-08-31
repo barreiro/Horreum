@@ -12,14 +12,13 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.SequenceGenerator;
 
 import java.time.LocalDate;
-import java.time.temporal.ChronoUnit;
 import java.util.Objects;
 import java.util.UUID;
 
 import static jakarta.persistence.GenerationType.SEQUENCE;
 
 @Entity(name = "userinfo_token")
-public class AuthenticationToken extends PanacheEntityBase {
+public class AuthenticationToken extends PanacheEntityBase implements Comparable<AuthenticationToken> {
 
     // locked authentication tokens are not listed and can't be renewed either
     public static long DEFAULT_EXPIRATION_DAYS = 400, LOCKED_EXPIRATION_DAYS = 7;
@@ -42,8 +41,12 @@ public class AuthenticationToken extends PanacheEntityBase {
 
     private final String name;
 
+    @Column(name = "date_created")
+    private LocalDate dateCreated;
     @Column(name = "date_expired")
     private LocalDate dateExpired;
+    @Column(name = "last_access")
+    private LocalDate lastAccess;
     private boolean revoked;
 
     public AuthenticationToken() {
@@ -57,6 +60,7 @@ public class AuthenticationToken extends PanacheEntityBase {
     public AuthenticationToken(String tokenName, long expiration) {
         token = UUID.randomUUID();
         name = tokenName;
+        dateCreated = LocalDate.now();
         dateExpired = LocalDate.now().plusDays(expiration);
         revoked = false;
     }
@@ -69,7 +73,7 @@ public class AuthenticationToken extends PanacheEntityBase {
         return token.toString();
     }
 
-    public boolean isLocked() {
+    public boolean isOld() {
         return dateExpired.plusDays(LOCKED_EXPIRATION_DAYS).isBefore(LocalDate.now());
     }
 
@@ -77,12 +81,13 @@ public class AuthenticationToken extends PanacheEntityBase {
         return LocalDate.now().isAfter(dateExpired);
     }
 
-    public long daysToExpiration() {
-        return ChronoUnit.DAYS.between(LocalDate.now(), dateExpired);
-    }
-
     public boolean isValid() {
-        return !(isRevoked() || isExpired());
+        if (isRevoked() || isExpired()) {
+            return false;
+        } else {
+            lastAccess = LocalDate.now();
+            return true;
+        }
     }
 
     public boolean isRevoked() {
@@ -95,8 +100,8 @@ public class AuthenticationToken extends PanacheEntityBase {
     }
 
     public void renew(long days) {
-        if (isLocked()) {
-            throw new IllegalStateException("Token has expired and cannot be renewed");
+        if (isOld()) {
+            throw new IllegalStateException("Token has expired long ago and cannot be renewed");
         }
         dateExpired = LocalDate.now().plusDays(days);
     }
@@ -118,10 +123,15 @@ public class AuthenticationToken extends PanacheEntityBase {
         UserService.HorreumAuthenticationToken token = new UserService.HorreumAuthenticationToken();
         token.id = id;
         token.name = name;
+        token.dateCreated = dateCreated;
         token.dateExpired = dateExpired;
+        token.lastAccess = lastAccess;
         token.isExpired = isExpired();
         token.isRevoked = isRevoked();
         return token;
     }
 
+    @Override public int compareTo(AuthenticationToken other) {
+        return dateCreated.compareTo(other.dateCreated);
+    }
 }

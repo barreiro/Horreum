@@ -8,6 +8,7 @@ import io.quarkus.security.runtime.QuarkusPrincipal;
 import io.quarkus.security.runtime.QuarkusSecurityIdentity;
 import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.transaction.Transactional;
 
 import java.util.UUID;
 
@@ -20,6 +21,7 @@ import java.util.UUID;
         return AuthenticationTokenRequest.class;
     }
 
+    @Transactional
     @Override public Uni<SecurityIdentity> authenticate(AuthenticationTokenRequest request, AuthenticationRequestContext context) {
         return context.runBlocking(() -> {
             AuthenticationToken dbToken = AuthenticationToken.find("token", UUID.fromString(request.getToken())).firstResult();

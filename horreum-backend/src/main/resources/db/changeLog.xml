@@ -4579,7 +4579,9 @@
             </column>
             <column name="name" type="text"/>
             <column name="revoked" type="bool"/>
+            <column name="date_created" type="date"/>
             <column name="date_expired" type="date"/>
+            <column name="last_access" type="date"/>
         </createTable>
         <addForeignKeyConstraint constraintName="fk_userinfo_token"
                                  baseTableName="userinfo_token" baseColumnNames="username"

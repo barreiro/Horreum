@@ -186,6 +186,8 @@ public interface UserService {
    class HorreumAuthenticationToken {
       public long id;
       public String name;
+      public LocalDate dateCreated;
+      public LocalDate lastAccess;
       public LocalDate dateExpired;
       public boolean isExpired;
       public boolean isRevoked;

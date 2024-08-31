@@ -263,8 +263,8 @@ public class UserServiceImpl implements UserService {
     @WithRoles(extras = Roles.HORREUM_SYSTEM)
     @Override public List<HorreumAuthenticationToken> authenticationTokens() {
         return currentUser().authenticationTokens.stream()
-                                                 .filter(t -> !t.isLocked())
-                                                 .sorted((a, b) -> (int) (a.daysToExpiration() - b.daysToExpiration()))
+                                                 .filter(t -> !t.isOld())
+                                                 .sorted()
                                                  .map(AuthenticationToken::toHorreumAuthenticationToken)
                                                  .toList();
     }

@@ -61,6 +61,8 @@ export default function AuthenticationTokens() {
             return <Label color="red">Revoked</Label>
         } else if (token.isExpired) {
             return <Label color="grey">Expired</Label>
+        } else if (!token.lastAccess) {
+            return <Label color="cyan">Never used</Label>
         } else if (token.dateExpired) {
             const d = daysTo(token.dateExpired)
             if (d < 1) {
@@ -74,11 +76,39 @@ export default function AuthenticationTokens() {
                 return <Label color="green">Expires in less than a month</Label>
             }
         }
-        return <></>
+        return <Label color="green">Valid</Label>
+    }
+
+    const tokenCreatedTooltip = (token: HorreumAuthenticationToken) => {
+        if (!token.dateCreated) {
+            return ""
+        } else {
+            const d = -daysTo(token.dateCreated)
+            if (d == 0) {
+                return "Token was created today"
+            } else {
+                return `Token was created ${d} days ago`
+            }
+        }
+    }
+
+    const tokenAccessTooltip = (token: HorreumAuthenticationToken) => {
+        if (!token.lastAccess) {
+            return "Token has never been used"
+        } else {
+            const d = -daysTo(token.lastAccess)
+            if (d == 0) {
+                return "Token was last used today"
+            } else {
+                return `Token was last used ${d} days ago`
+            }
+        }
     }
 
     const tokenExpirationTooltip = (token: HorreumAuthenticationToken) => {
-        if (token.isExpired) {
+        if (token.isRevoked) {
+            return "Token has been revoked"
+        } else if (token.isExpired) {
             return "Token has expired"
         } else if (token.dateExpired) {
             const d = daysTo(token.dateExpired)
@@ -88,7 +118,6 @@ export default function AuthenticationTokens() {
                 return `Token expires in ${d} days`
             }
         }
-        return ""
     }
 
     useEffect(() => {
@@ -100,21 +129,33 @@ export default function AuthenticationTokens() {
             <Table aria-label="AuthenticationTokens" isStickyHeader borders={false}>
                 <Thead>
                     <Tr>
-                        <Th label="name">Token Name</Th>
-                        <Th label="status">Status</Th>
+                        <Th label="name" width={50}>Token Name</Th>
+                        <Th label="create">Creation date</Th>
+                        <Th label="access">Last usage</Th>
                         <Th label="expiration">Expiration date</Th>
+                        <Th label="status">Status</Th>
                     </Tr>
                 </Thead>
                 <Tbody>
                     {authenticationTokens.map((token, i) => (
                         <Tr key={`token-${i}`}>
                             <Td dataLabel="name">{token.name}</Td>
-                            <Td dataLabel="status">{tokenStatus(token)}</Td>
+                            <Td dataLabel="access">
+                                <Tooltip content={tokenCreatedTooltip(token)}>
+                                    <span>{token.dateCreated?.toLocaleDateString() || "undefined"}</span>
+                                </Tooltip>
+                            </Td>
+                            <Td dataLabel="access">
+                                <Tooltip content={tokenAccessTooltip(token)} isVisible={token.lastAccess != null}>
+                                    <span>{token.lastAccess?.toLocaleDateString()}</span>
+                                </Tooltip>
+                            </Td>
                             <Td dataLabel="expiration">
                                 <Tooltip content={tokenExpirationTooltip(token)}>
                                     <span>{token.dateExpired?.toLocaleDateString() || "undefined"}</span>
                                 </Tooltip>
                             </Td>
+                            <Td dataLabel="status">{tokenStatus(token)}</Td>
                             <Td isActionCell>
                                 <ActionsColumn items={token.isRevoked ? [] : [
                                     {
@@ -191,7 +232,8 @@ export default function AuthenticationTokens() {
                 title={`New token: ${newTokenName}`}
                 footer={
                     <HelperText>
-                        <HelperTextItem variant="warning" hasIcon>This is the only time you'll be able to see the token</HelperTextItem>
+                        <HelperTextItem variant="warning" hasIcon>This is the only time you'll be able to see the
+                            token</HelperTextItem>
                     </HelperText>
                 }
                 aria-label="new-authentication-token"
