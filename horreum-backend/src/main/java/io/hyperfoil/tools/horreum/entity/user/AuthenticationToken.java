@@ -1,9 +1,11 @@
 package io.hyperfoil.tools.horreum.entity.user;
 
 import io.hyperfoil.tools.horreum.api.internal.services.UserService;
+import io.hyperfoil.tools.horreum.server.AuthenticationTokenRequest;
 import io.quarkus.hibernate.orm.panache.PanacheEntityBase;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.Id;
@@ -41,6 +43,9 @@ public class AuthenticationToken extends PanacheEntityBase implements Comparable
 
     private final String name;
 
+    @Enumerated
+    public final UserService.HorreumAuthenticationTokenType type;
+
     @Column(name = "date_created")
     private LocalDate dateCreated;
     @Column(name = "date_expired")
@@ -58,8 +63,17 @@ public class AuthenticationToken extends PanacheEntityBase implements Comparable
     }
 
     public AuthenticationToken(String tokenName, long expiration) {
+        this(tokenName, expiration, UserService.HorreumAuthenticationTokenType.USER);
+    }
+
+    public AuthenticationToken(UserService.HorreumAuthenticationTokenRequest request) {
+        this(request.name, request.expiration, request.type);
+    }
+
+    public AuthenticationToken(String name, long expiration, UserService.HorreumAuthenticationTokenType type) {
         token = UUID.randomUUID();
-        name = tokenName;
+        this.name = name;
+        this.type = type;
         dateCreated = LocalDate.now();
         dateExpired = LocalDate.now().plusDays(expiration);
         revoked = false;
@@ -123,6 +137,7 @@ public class AuthenticationToken extends PanacheEntityBase implements Comparable
         UserService.HorreumAuthenticationToken token = new UserService.HorreumAuthenticationToken();
         token.id = id;
         token.name = name;
+        token.type = type;
         token.dateCreated = dateCreated;
         token.dateExpired = dateExpired;
         token.lastAccess = lastAccess;

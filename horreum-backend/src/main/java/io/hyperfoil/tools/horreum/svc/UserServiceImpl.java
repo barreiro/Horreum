@@ -249,7 +249,7 @@ public class UserServiceImpl implements UserService {
         }
         UserInfo userInfo = currentUser();
 
-        AuthenticationToken authToken = new AuthenticationToken(tokenRequest.name, tokenRequest.expiration);
+        AuthenticationToken authToken = new AuthenticationToken(tokenRequest);
         authToken.user = userInfo;
         userInfo.authenticationTokens.add(authToken);
         authToken.persist();

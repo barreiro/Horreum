@@ -52,6 +52,7 @@ import java.util.List;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
+import static io.hyperfoil.tools.horreum.api.internal.services.UserService.HorreumAuthenticationTokenType.USER;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -64,7 +65,7 @@ public class HorreumClientIT implements QuarkusTestBeforeTestExecutionCallback, 
 
     @org.junit.jupiter.api.Test
     public void testAuthenticationToken() {
-        String theToken = horreumClient.userService.newAuthenticationToken(new UserService.HorreumAuthenticationTokenRequest("Test token", 10));
+        String theToken = horreumClient.userService.newAuthenticationToken(new UserService.HorreumAuthenticationTokenRequest("Test token", 10, USER));
 
         try (HorreumClient tokenClient = new HorreumClient.Builder()
                 .horreumUrl("http://localhost:".concat(System.getProperty("quarkus.http.test-port")))

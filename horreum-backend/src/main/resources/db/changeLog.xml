@@ -4572,17 +4572,21 @@
         <createTable tableName="userinfo_token">
             <column name="id" type="integer"/>
             <column name="token" type="uuid">
-                <constraints nullable="false" primaryKey="true"/>
+                <constraints nullable="false" unique="true"/>
             </column>
             <column name="username" type="text">
                 <constraints nullable="false"/>
             </column>
             <column name="name" type="text"/>
+            <column name="type" type="smallint"/>
             <column name="revoked" type="bool"/>
             <column name="date_created" type="date"/>
             <column name="date_expired" type="date"/>
             <column name="last_access" type="date"/>
         </createTable>
+        <createIndex tableName="userinfo_token" indexName="userinfo_token_token">
+            <column name="token" />
+        </createIndex>
         <addForeignKeyConstraint constraintName="fk_userinfo_token"
                                  baseTableName="userinfo_token" baseColumnNames="username"
                                  referencedTableName="userinfo" referencedColumnNames="username"/>

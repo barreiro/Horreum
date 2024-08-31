@@ -170,22 +170,32 @@ public interface UserService {
 
    // --- //
 
+   /**
+    * The token type allows the access to be scoped
+    */
+   enum HorreumAuthenticationTokenType {
+      USER
+   }
+
    class HorreumAuthenticationTokenRequest {
       public String name;
       public long expiration;
+      public HorreumAuthenticationTokenType type;
 
       public HorreumAuthenticationTokenRequest() {
       }
 
-      public HorreumAuthenticationTokenRequest(String name, long expiration) {
+      public HorreumAuthenticationTokenRequest(String name, long expiration, HorreumAuthenticationTokenType type) {
          this.name = name;
          this.expiration = expiration;
+         this.type = type;
       }
    }
 
    class HorreumAuthenticationToken {
       public long id;
       public String name;
+      public HorreumAuthenticationTokenType type;
       public LocalDate dateCreated;
       public LocalDate lastAccess;
       public LocalDate dateExpired;

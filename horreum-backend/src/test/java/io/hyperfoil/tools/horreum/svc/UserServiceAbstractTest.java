@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import static io.hyperfoil.tools.horreum.api.internal.services.UserService.HorreumAuthenticationTokenType.USER;
 import static io.restassured.RestAssured.given;
 import static org.apache.http.HttpStatus.SC_OK;
 import static org.apache.http.HttpStatus.SC_UNAUTHORIZED;
@@ -545,7 +546,7 @@ public abstract class UserServiceAbstractTest {
             assertTrue(userService.authenticationTokens().isEmpty());
 
             // create token
-            String token = userService.newAuthenticationToken(new UserService.HorreumAuthenticationTokenRequest("Test token", 10));
+            String token = userService.newAuthenticationToken(new UserService.HorreumAuthenticationTokenRequest("Test token", 10, USER));
             assertFalse(token.length() < 32); // token should be big enough
 
             // one token
@@ -559,7 +560,7 @@ public abstract class UserServiceAbstractTest {
             assertTrue(userService.authenticationTokens().get(0).isRevoked);
 
             // create token
-            String expiredToken = userService.newAuthenticationToken(new UserService.HorreumAuthenticationTokenRequest("Expired token", -1));
+            String expiredToken = userService.newAuthenticationToken(new UserService.HorreumAuthenticationTokenRequest("Expired token", -1, USER));
             assertFalse(expiredToken.length() < 32); // token should be big enough
 
             // one expired token
@@ -568,7 +569,7 @@ public abstract class UserServiceAbstractTest {
             assertTrue(twoTokens.stream().anyMatch(t -> t.isExpired));
 
             // a token deep in the past
-            assertThrows(ServiceException.class, () -> userService.newAuthenticationToken(new UserService.HorreumAuthenticationTokenRequest("Very old token", -10)));
+            assertThrows(ServiceException.class, () -> userService.newAuthenticationToken(new UserService.HorreumAuthenticationTokenRequest("Very old token", -10, USER)));
         });
     }
 

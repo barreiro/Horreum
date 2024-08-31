@@ -56,27 +56,13 @@ export default function AuthenticationTokens() {
         setNewTokenExpiration(defaultExpiration())
     }
 
-    const tokenStatus = (token: HorreumAuthenticationToken) => {
-        if (token.isRevoked) {
-            return <Label color="red">Revoked</Label>
-        } else if (token.isExpired) {
-            return <Label color="grey">Expired</Label>
-        } else if (!token.lastAccess) {
-            return <Label color="cyan">Never used</Label>
-        } else if (token.dateExpired) {
-            const d = daysTo(token.dateExpired)
-            if (d < 1) {
-                return <Label color="orange">Expires TODAY</Label>
-            } else if (d < 2) {
-                return <Label color="orange">Expires TOMORROW</Label>
-            }
-            if (d < 7) {
-                return <Label color="gold">Expires in less than a week</Label>
-            } else if (d < 30) {
-                return <Label color="green">Expires in less than a month</Label>
-            }
+    const tokenTypeTooltip = (token: HorreumAuthenticationToken) => {
+        switch (token.type) {
+            case "USER":
+                return "This token has the same permissions as this user";
+            default:
+                return "Unknown"
         }
-        return <Label color="green">Valid</Label>
     }
 
     const tokenCreatedTooltip = (token: HorreumAuthenticationToken) => {
@@ -120,6 +106,30 @@ export default function AuthenticationTokens() {
         }
     }
 
+    const tokenStatus = (token: HorreumAuthenticationToken) => {
+        if (token.isRevoked) {
+            return <Label color="red">Revoked</Label>
+        } else if (token.isExpired) {
+            return <Label color="grey">Expired</Label>
+        } else if (!token.lastAccess) {
+            return <Label color="cyan">Never used</Label>
+        } else if (token.dateExpired) {
+            const d = daysTo(token.dateExpired)
+            if (d < 1) {
+                return <Label color="orange">Expires TODAY</Label>
+            } else if (d < 2) {
+                return <Label color="orange">Expires TOMORROW</Label>
+            }
+            if (d < 7) {
+                return <Label color="gold">Expires in less than a week</Label>
+            } else if (d < 30) {
+                return <Label color="green">Expires in less than a month</Label>
+            }
+        }
+        return <Label color="green">Valid</Label>
+    }
+
+
     useEffect(() => {
         void refreshTokens();
     }, [])
@@ -129,7 +139,8 @@ export default function AuthenticationTokens() {
             <Table aria-label="AuthenticationTokens" isStickyHeader borders={false}>
                 <Thead>
                     <Tr>
-                        <Th label="name" width={50}>Token Name</Th>
+                        <Th label="name" width={40}>Name</Th>
+                        <Th label="name">Type</Th>
                         <Th label="create">Creation date</Th>
                         <Th label="access">Last usage</Th>
                         <Th label="expiration">Expiration date</Th>
@@ -140,6 +151,11 @@ export default function AuthenticationTokens() {
                     {authenticationTokens.map((token, i) => (
                         <Tr key={`token-${i}`}>
                             <Td dataLabel="name">{token.name}</Td>
+                            <Td dataLabel="type">
+                                <Tooltip content={tokenTypeTooltip(token)} isVisible={token.type != null}>
+                                    <span>{token.type}</span>
+                                </Tooltip>
+                            </Td>
                             <Td dataLabel="access">
                                 <Tooltip content={tokenCreatedTooltip(token)}>
                                     <span>{token.dateCreated?.toLocaleDateString() || "undefined"}</span>
@@ -196,7 +212,8 @@ export default function AuthenticationTokens() {
                         onClick={() => {
                             userApi.newAuthenticationToken({
                                 name: newTokenName,
-                                expiration: daysTo(new Date(`${newTokenExpiration}`))
+                                expiration: daysTo(new Date(`${newTokenExpiration}`)),
+                                type: "USER"
                             })
                                 .then((tokenValue) => {
                                     setNewAuthenticationTokenValue(tokenValue)
@@ -214,11 +231,7 @@ export default function AuthenticationTokens() {
             >
                 <Form isHorizontal>
                     <FormGroup isRequired label="Token Name" fieldId="newTokenName">
-                        <TextInput
-                            isRequired
-                            value={newTokenName}
-                            onChange={(_event, val) => setNewTokenName(val)}
-                        />
+                        <TextInput isRequired value={newTokenName} onChange={(_event, val) => setNewTokenName(val)}/>
                     </FormGroup>
                     <FormGroup label="Expiration date" fieldId="newTokenExpiration">
                         <DatePicker value={newTokenExpiration}
@@ -232,8 +245,9 @@ export default function AuthenticationTokens() {
                 title={`New token: ${newTokenName}`}
                 footer={
                     <HelperText>
-                        <HelperTextItem variant="warning" hasIcon>This is the only time you'll be able to see the
-                            token</HelperTextItem>
+                        <HelperTextItem variant="warning" hasIcon>
+                            This is the only time you'll be able to see the token
+                        </HelperTextItem>
                     </HelperText>
                 }
                 aria-label="new-authentication-token"
