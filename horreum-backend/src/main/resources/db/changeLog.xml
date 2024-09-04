@@ -4571,7 +4571,7 @@
         <createSequence sequenceName="userinfo_token_id_seq" startValue="1" incrementBy="1" cacheSize="1" />
         <createTable tableName="userinfo_token">
             <column name="id" type="integer"/>
-            <column name="token" type="uuid">
+            <column name="hash" type="text">
                 <constraints nullable="false" unique="true"/>
             </column>
             <column name="username" type="text">
@@ -4584,8 +4584,8 @@
             <column name="date_expired" type="date"/>
             <column name="last_access" type="date"/>
         </createTable>
-        <createIndex tableName="userinfo_token" indexName="userinfo_token_token">
-            <column name="token" />
+        <createIndex tableName="userinfo_token" indexName="userinfo_token_hash">
+            <column name="hash" />
         </createIndex>
         <addForeignKeyConstraint constraintName="fk_userinfo_token"
                                  baseTableName="userinfo_token" baseColumnNames="username"

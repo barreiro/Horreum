@@ -10,8 +10,6 @@ import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.transaction.Transactional;
 
-import java.util.UUID;
-
 /**
  * Retrieve and validate the token get from {@link AuthenticationTokenMechanism} and create a SecurityIdentity from it.
  */
@@ -23,13 +21,12 @@ import java.util.UUID;
 
     @Transactional
     @Override public Uni<SecurityIdentity> authenticate(AuthenticationTokenRequest request, AuthenticationRequestContext context) {
-        return context.runBlocking(() -> {
-            AuthenticationToken dbToken = AuthenticationToken.find("token", UUID.fromString(request.getToken())).firstResult();
-            if (dbToken != null && dbToken.isValid()) {
-                // roles will be populated in RolesAugmentor
-                return QuarkusSecurityIdentity.builder().setPrincipal(new QuarkusPrincipal(dbToken.user.username)).build();
-            }
-            return null;
-        });
+        return context.runBlocking(() -> AuthenticationToken.findValid(request.getToken()).map(AuthenticationTokenIdentityProvider::from).orElse(null));
     }
+
+    private static SecurityIdentity from(AuthenticationToken token) {
+        // roles will be populated in RolesAugmentor
+        return QuarkusSecurityIdentity.builder().setPrincipal(new QuarkusPrincipal(token.user.username)).build();
+    }
+
 }

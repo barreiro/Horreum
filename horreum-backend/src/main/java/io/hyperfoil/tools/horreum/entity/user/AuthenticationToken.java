@@ -1,7 +1,6 @@
 package io.hyperfoil.tools.horreum.entity.user;
 
 import io.hyperfoil.tools.horreum.api.internal.services.UserService;
-import io.hyperfoil.tools.horreum.server.AuthenticationTokenRequest;
 import io.quarkus.hibernate.orm.panache.PanacheEntityBase;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -12,18 +11,36 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.SequenceGenerator;
+import jakarta.persistence.Transient;
 
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.LocalDate;
+import java.util.Base64;
+import java.util.Comparator;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Stream;
 
 import static jakarta.persistence.GenerationType.SEQUENCE;
 
 @Entity(name = "userinfo_token")
 public class AuthenticationToken extends PanacheEntityBase implements Comparable<AuthenticationToken> {
 
-    // locked authentication tokens are not listed and can't be renewed either
-    public static long DEFAULT_EXPIRATION_DAYS = 400, LOCKED_EXPIRATION_DAYS = 7;
+    // old authentication tokens are not listed and can't be renewed either
+    // they are kept around to prevent re-use
+    public static long OLD_EXPIRATION_DAYS = 7;
+
+    private static MessageDigest digest;
+
+    static {
+        try {
+            digest = MessageDigest.getInstance("SHA-256");
+        } catch (NoSuchAlgorithmException e) {
+            // ignore
+        }
+    }
 
     @Id
     @SequenceGenerator(
@@ -39,7 +56,9 @@ public class AuthenticationToken extends PanacheEntityBase implements Comparable
     @JoinColumn(name = "username")
     public UserInfo user;
 
-    private final UUID token;
+    @Transient private final UUID token;
+
+    private final String hash;
 
     private final String name;
 
@@ -55,15 +74,6 @@ public class AuthenticationToken extends PanacheEntityBase implements Comparable
     private boolean revoked;
 
     public AuthenticationToken() {
-        this("");
-    }
-
-    public AuthenticationToken(String tokenName) {
-        this(tokenName, DEFAULT_EXPIRATION_DAYS);
-    }
-
-    public AuthenticationToken(String tokenName, long expiration) {
-        this(tokenName, expiration, UserService.HorreumAuthenticationTokenType.USER);
     }
 
     public AuthenticationToken(UserService.HorreumAuthenticationTokenRequest request) {
@@ -74,6 +84,7 @@ public class AuthenticationToken extends PanacheEntityBase implements Comparable
         token = UUID.randomUUID();
         this.name = name;
         this.type = type;
+        hash = computeHash(getTokenString());
         dateCreated = LocalDate.now();
         dateExpired = LocalDate.now().plusDays(expiration);
         revoked = false;
@@ -83,12 +94,23 @@ public class AuthenticationToken extends PanacheEntityBase implements Comparable
         return name;
     }
 
-    public String getToken() {
-        return token.toString();
+    public String getTokenString() {
+        StringBuilder builder = new StringBuilder(50);
+        builder.append("H");
+        switch (type) {
+            case USER:
+                builder.append("USR");
+                break;
+            default:
+                builder.append("UNK");
+        }
+        builder.append("_");
+        builder.append(token.toString().replace("-", "_").toUpperCase());
+        return builder.toString();
     }
 
     public boolean isOld() {
-        return dateExpired.plusDays(LOCKED_EXPIRATION_DAYS).isBefore(LocalDate.now());
+        return dateExpired.plusDays(OLD_EXPIRATION_DAYS).isBefore(LocalDate.now());
     }
 
     public boolean isExpired() {
@@ -120,6 +142,23 @@ public class AuthenticationToken extends PanacheEntityBase implements Comparable
         dateExpired = LocalDate.now().plusDays(days);
     }
 
+    // --- //
+
+    private static String computeHash(String token) {
+        return Base64.getEncoder().encodeToString(digest.digest(token.getBytes()));
+    }
+
+    public static Optional<AuthenticationToken> findValid(String token) {
+        // validate token structure before computing hash
+        if (token.startsWith("H") && Stream.of(4,13,18,23,28).allMatch(i -> token.charAt(i) == '_')) {
+            return AuthenticationToken.<AuthenticationToken>find("hash", computeHash(token)).firstResultOptional().filter(AuthenticationToken::isValid);
+        }  else {
+            return Optional.empty();
+        }
+    }
+
+    // --- //
+
     @Override public boolean equals(Object o) {
         if (this == o) {
             return true;
@@ -147,6 +186,6 @@ public class AuthenticationToken extends PanacheEntityBase implements Comparable
     }
 
     @Override public int compareTo(AuthenticationToken other) {
-        return dateCreated.compareTo(other.dateCreated);
+        return Comparator.<AuthenticationToken, LocalDate>comparing(a -> a.dateCreated).thenComparing(a -> a.name).compare(this, other);
     }
 }

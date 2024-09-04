@@ -1,6 +1,7 @@
 package io.hyperfoil.tools.horreum.svc;
 
 import io.hyperfoil.tools.horreum.api.internal.services.UserService;
+import io.hyperfoil.tools.horreum.entity.user.AuthenticationToken;
 import io.hyperfoil.tools.horreum.entity.user.UserInfo;
 import io.hyperfoil.tools.horreum.server.SecurityBootstrap;
 import io.hyperfoil.tools.horreum.server.WithRoles;
@@ -548,6 +549,7 @@ public abstract class UserServiceAbstractTest {
             // create token
             String token = userService.newAuthenticationToken(new UserService.HorreumAuthenticationTokenRequest("Test token", 10, USER));
             assertFalse(token.length() < 32); // token should be big enough
+            assertTrue(AuthenticationToken.findValid(token).isPresent());
 
             // one token
             List <UserService.HorreumAuthenticationToken> tokens = userService.authenticationTokens();

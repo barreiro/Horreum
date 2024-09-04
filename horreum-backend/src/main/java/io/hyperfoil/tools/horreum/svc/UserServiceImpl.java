@@ -256,7 +256,7 @@ public class UserServiceImpl implements UserService {
         userInfo.persist();
 
         Log.infov("{0} created authentication token {1} valid until {2}", identity.getPrincipal().getName(), tokenRequest.name, LocalDate.now().plusDays(tokenRequest.expiration));
-        return authToken.getToken();
+        return authToken.getTokenString();
     }
 
     @Transactional
