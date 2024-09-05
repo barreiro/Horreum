@@ -4568,9 +4568,9 @@
     </changeSet>
     <changeSet id="123" author="barreiro">
         <validCheckSum>ANY</validCheckSum>
-        <createSequence sequenceName="userinfo_token_id_seq" startValue="1" incrementBy="1" cacheSize="1" />
-        <createTable tableName="userinfo_token">
-            <column name="id" type="integer"/>
+        <createSequence sequenceName="userinfo_apikey_id_seq" startValue="1" incrementBy="1" cacheSize="1" />
+        <createTable tableName="userinfo_apikey">
+            <column name="id" type="bigint"/>
             <column name="hash" type="text">
                 <constraints nullable="false" unique="true"/>
             </column>
@@ -4580,22 +4580,22 @@
             <column name="name" type="text"/>
             <column name="type" type="smallint"/>
             <column name="revoked" type="bool"/>
-            <column name="date_created" type="date"/>
-            <column name="date_expired" type="date"/>
-            <column name="last_access" type="date"/>
+            <column name="creation" type="date"/>
+            <column name="expiration" type="date"/>
+            <column name="access" type="date"/>
         </createTable>
-        <createIndex tableName="userinfo_token" indexName="userinfo_token_hash">
+        <createIndex tableName="userinfo_apikey" indexName="userinfo_apikey_hash">
             <column name="hash" />
         </createIndex>
-        <addForeignKeyConstraint constraintName="fk_userinfo_token"
-                                 baseTableName="userinfo_token" baseColumnNames="username"
+        <addForeignKeyConstraint constraintName="fk_userinfo_apikey"
+                                 baseTableName="userinfo_apikey" baseColumnNames="username"
                                  referencedTableName="userinfo" referencedColumnNames="username"/>
         <sql>
-            GRANT SELECT, INSERT, DELETE, UPDATE ON TABLE userinfo_token TO "${quarkus.datasource.username}";
-            GRANT ALL ON SEQUENCE userinfo_token_id_seq TO "${quarkus.datasource.username}";
-            ALTER TABLE userinfo_token ENABLE ROW LEVEL SECURITY;
-            CREATE POLICY userinfo_token_read ON userinfo_token USING (has_role('horreum.system'));
-            CREATE POLICY userinfo_token_rw ON userinfo_token FOR ALL USING (has_role(username));
+            GRANT SELECT, INSERT, DELETE, UPDATE ON TABLE userinfo_apikey TO "${quarkus.datasource.username}";
+            GRANT ALL ON SEQUENCE userinfo_apikey_id_seq TO "${quarkus.datasource.username}";
+            ALTER TABLE userinfo_apikey ENABLE ROW LEVEL SECURITY;
+            CREATE POLICY userinfo_apikey_read ON userinfo_apikey USING (has_role('horreum.system'));
+            CREATE POLICY userinfo_apikey_rw ON userinfo_apikey FOR ALL USING (has_role(username));
         </sql>
     </changeSet>
 </databaseChangeLog>

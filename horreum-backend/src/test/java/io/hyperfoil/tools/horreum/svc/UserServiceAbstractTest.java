@@ -1,7 +1,7 @@
 package io.hyperfoil.tools.horreum.svc;
 
 import io.hyperfoil.tools.horreum.api.internal.services.UserService;
-import io.hyperfoil.tools.horreum.entity.user.AuthenticationToken;
+import io.hyperfoil.tools.horreum.entity.user.ApiKey;
 import io.hyperfoil.tools.horreum.entity.user.UserInfo;
 import io.hyperfoil.tools.horreum.server.SecurityBootstrap;
 import io.hyperfoil.tools.horreum.server.WithRoles;
@@ -27,7 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import static io.hyperfoil.tools.horreum.api.internal.services.UserService.HorreumAuthenticationTokenType.USER;
+import static io.hyperfoil.tools.horreum.api.internal.services.UserService.KeyType.USER;
 import static io.restassured.RestAssured.given;
 import static org.apache.http.HttpStatus.SC_OK;
 import static org.apache.http.HttpStatus.SC_UNAUTHORIZED;
@@ -531,47 +531,47 @@ public abstract class UserServiceAbstractTest {
     }
 
     @TestSecurity(user = KEYCLOAK_ADMIN, roles = { Roles.ADMIN })
-    @Test void authenticationTokens() {
-        String testTeam = "auth-token-test-team", authTokenUser = "token-user";
+    @Test void apiKeys() {
+        String testTeam = "apikeys-team", apiUser = "api-user";
         userService.addTeam(testTeam);
 
         // add a user to the team
         UserService.NewUser user = new UserService.NewUser();
-        user.user = new UserService.UserData("", authTokenUser, "Auth Token", "User", "token@horreum.io");
+        user.user = new UserService.UserData("", apiUser, "API", "User", "api@horreum.io");
         user.password = "whatever";
         user.team = testTeam;
         user.roles = List.of(Roles.MANAGER);
         userService.createUser(user);
 
-        overrideTestSecurity(authTokenUser, Set.of(Roles.MANAGER, testTeam.substring(0, testTeam.length() - 4) + Roles.MANAGER), () -> {
-            assertTrue(userService.authenticationTokens().isEmpty());
+        overrideTestSecurity(apiUser, Set.of(Roles.MANAGER, testTeam.substring(0, testTeam.length() - 4) + Roles.MANAGER), () -> {
+            assertTrue(userService.apiKeys().isEmpty());
 
-            // create token
-            String token = userService.newAuthenticationToken(new UserService.HorreumAuthenticationTokenRequest("Test token", 10, USER));
-            assertFalse(token.length() < 32); // token should be big enough
-            assertTrue(AuthenticationToken.findValid(token).isPresent());
+            // create key
+            String key = userService.newApiKey(new UserService.ApiKeyRequest("Test key", 10, USER));
+            assertFalse(key.length() < 32); // key should be big enough
+            assertTrue(ApiKey.findValid(key).isPresent());
 
-            // one token
-            List <UserService.HorreumAuthenticationToken> tokens = userService.authenticationTokens();
-            assertEquals(1, tokens.size());
-            assertFalse(tokens.get(0).isExpired);
-            assertFalse(tokens.get(0).isRevoked);
+            // one key
+            List <UserService.ApiKeyResponse> keys = userService.apiKeys();
+            assertEquals(1, keys.size());
+            assertFalse(keys.get(0).isExpired);
+            assertFalse(keys.get(0).isRevoked);
 
-            // revoke token
-            userService.revokeAuthenticationToken(tokens.get(0).id);
-            assertTrue(userService.authenticationTokens().get(0).isRevoked);
+            // revoke key
+            userService.revokeApiKey(keys.get(0).id);
+            assertTrue(userService.apiKeys().get(0).isRevoked);
 
-            // create token
-            String expiredToken = userService.newAuthenticationToken(new UserService.HorreumAuthenticationTokenRequest("Expired token", -1, USER));
-            assertFalse(expiredToken.length() < 32); // token should be big enough
+            // create key
+            String expiredKey = userService.newApiKey(new UserService.ApiKeyRequest("Expired key", -1, USER));
+            assertFalse(expiredKey.length() < 32); // key should be big enough
 
-            // one expired token
-            List <UserService.HorreumAuthenticationToken> twoTokens = userService.authenticationTokens();
-            assertEquals(2, twoTokens.size());
-            assertTrue(twoTokens.stream().anyMatch(t -> t.isExpired));
+            // one expired key
+            List <UserService.ApiKeyResponse> twoKeys = userService.apiKeys();
+            assertEquals(2, twoKeys.size());
+            assertTrue(twoKeys.stream().anyMatch(t -> t.isExpired));
 
-            // a token deep in the past
-            assertThrows(ServiceException.class, () -> userService.newAuthenticationToken(new UserService.HorreumAuthenticationTokenRequest("Very old token", -10, USER)));
+            // a key deep in the past
+            assertThrows(ServiceException.class, () -> userService.newApiKey(new UserService.ApiKeyRequest("Very old key", -10, USER)));
         });
     }
 

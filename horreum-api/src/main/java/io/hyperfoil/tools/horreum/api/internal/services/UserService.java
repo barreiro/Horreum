@@ -119,25 +119,25 @@ public interface UserService {
    String resetPassword(@PathParam("team") String team, @RequestBody(required = true) String username);
 
    @POST
-   @Path("/token")
+   @Path("/apikey")
    @Produces("text/plain")
    @Blocking
-   String newAuthenticationToken(@RequestBody HorreumAuthenticationTokenRequest tokenRequest);
+   String newApiKey(@RequestBody ApiKeyRequest request);
 
    @GET
-   @Path("/token")
+   @Path("/apikey")
    @Blocking
-   List<HorreumAuthenticationToken> authenticationTokens();
+   List<ApiKeyResponse> apiKeys();
 
    @PUT
-   @Path("/token/{id}/revoke")
+   @Path("/apikey/{id}/revoke")
    @Blocking
-   void revokeAuthenticationToken(@PathParam("id") long tokenId);
+   void revokeApiKey(@PathParam("id") long keyId);
 
    @PUT
-   @Path("/token/{id}/renew")
+   @Path("/apikey/{id}/renew")
    @Blocking
-   void renewAuthenticationToken(@PathParam("id") long tokenId, @RequestBody long expiration);
+   void renewApiKey(@PathParam("id") long keyId, @RequestBody long expiration);
 
    // this is a simplified copy of org.keycloak.representations.idm.UserRepresentation
    class UserData {
@@ -171,34 +171,34 @@ public interface UserService {
    // --- //
 
    /**
-    * The token type allows the access to be scoped
+    * Key type allows the access to be scoped. 
     */
-   enum HorreumAuthenticationTokenType {
+   enum KeyType {
       USER
    }
 
-   class HorreumAuthenticationTokenRequest {
+   class ApiKeyRequest {
       public String name;
       public long expiration;
-      public HorreumAuthenticationTokenType type;
+      public KeyType type;
 
-      public HorreumAuthenticationTokenRequest() {
+      public ApiKeyRequest() {
       }
 
-      public HorreumAuthenticationTokenRequest(String name, long expiration, HorreumAuthenticationTokenType type) {
+      public ApiKeyRequest(String name, long expiration, KeyType type) {
          this.name = name;
          this.expiration = expiration;
          this.type = type;
       }
    }
 
-   class HorreumAuthenticationToken {
+   class ApiKeyResponse {
       public long id;
       public String name;
-      public HorreumAuthenticationTokenType type;
-      public LocalDate dateCreated;
-      public LocalDate lastAccess;
-      public LocalDate dateExpired;
+      public KeyType type;
+      public LocalDate creation;
+      public LocalDate access;
+      public LocalDate expiration;
       public boolean isExpired;
       public boolean isRevoked;
    }

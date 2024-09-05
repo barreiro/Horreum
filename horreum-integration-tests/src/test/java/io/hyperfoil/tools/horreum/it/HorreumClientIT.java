@@ -53,7 +53,7 @@ import java.util.List;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
-import static io.hyperfoil.tools.horreum.api.internal.services.UserService.HorreumAuthenticationTokenType.USER;
+import static io.hyperfoil.tools.horreum.api.internal.services.UserService.KeyType.USER;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -66,29 +66,29 @@ import static org.junit.jupiter.api.Assertions.fail;
 public class HorreumClientIT implements QuarkusTestBeforeTestExecutionCallback, QuarkusTestBeforeClassCallback, QuarkusTestBeforeEachCallback, QuarkusTestAfterEachCallback, QuarkusTestAfterAllCallback {
 
     @org.junit.jupiter.api.Test
-    public void testAuthenticationToken() {
-        String tokenName = "Test token";
-        String theToken = horreumClient.userService.newAuthenticationToken(new UserService.HorreumAuthenticationTokenRequest(tokenName, 10, USER));
+    public void testApiKeys() {
+        String keyName = "Test key";
+        String theKey = horreumClient.userService.newApiKey(new UserService.ApiKeyRequest(keyName, 10, USER));
 
-        try (HorreumClient tokenClient = new HorreumClient.Builder()
+        try (HorreumClient apiClient = new HorreumClient.Builder()
                 .horreumUrl("http://localhost:".concat(System.getProperty("quarkus.http.test-port")))
-                .horreumAuthenticationToken(theToken)
+                .horreumApiKey(theKey)
                 .build()) {
 
-            List<String> roles = tokenClient.userService.getRoles();
+            List<String> roles = apiClient.userService.getRoles();
             assertFalse(roles.isEmpty());
             assertTrue(roles.contains(TEST_TEAM.replace("team", Roles.TESTER)));
 
-            UserService.HorreumAuthenticationToken horreumToken = horreumClient.userService.authenticationTokens().get(0);
-            assertFalse(horreumToken.isRevoked);
-            assertFalse(horreumToken.isExpired);
-            assertEquals(LocalDate.now(), horreumToken.dateCreated);
-            assertEquals(LocalDate.now(), horreumToken.lastAccess);
-            assertEquals(USER, horreumToken.type);
+            UserService.ApiKeyResponse apiKey = horreumClient.userService.apiKeys().get(0);
+            assertFalse(apiKey.isRevoked);
+            assertFalse(apiKey.isExpired);
+            assertEquals(LocalDate.now(), apiKey.creation);
+            assertEquals(LocalDate.now(), apiKey.access);
+            assertEquals(USER, apiKey.type);
 
-            horreumClient.userService.revokeAuthenticationToken(horreumToken.id);
+            horreumClient.userService.revokeApiKey(apiKey.id);
 
-            assertThrows(NotAuthorizedException.class, () -> tokenClient.userService.getRoles().isEmpty());
+            assertThrows(NotAuthorizedException.class, () -> apiClient.userService.getRoles());
         }
     }
 

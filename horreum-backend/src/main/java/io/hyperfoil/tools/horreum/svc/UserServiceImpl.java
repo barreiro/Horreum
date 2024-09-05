@@ -1,7 +1,7 @@
 package io.hyperfoil.tools.horreum.svc;
 
 import io.hyperfoil.tools.horreum.api.internal.services.UserService;
-import io.hyperfoil.tools.horreum.entity.user.AuthenticationToken;
+import io.hyperfoil.tools.horreum.entity.user.ApiKey;
 import io.hyperfoil.tools.horreum.entity.user.UserInfo;
 import io.hyperfoil.tools.horreum.server.WithRoles;
 import io.hyperfoil.tools.horreum.svc.user.UserBackEnd;
@@ -34,6 +34,14 @@ public class UserServiceImpl implements UserService {
 
     @Inject Instance<UserBackEnd> backend;
 
+    private UserInfo currentUser() {
+        return UserInfo.<UserInfo>findByIdOptional(getUsername()).orElseThrow(() -> ServiceException.notFound(format("Username {0} not found", getUsername())));
+    }
+
+    private String getUsername() {
+        return identity.getPrincipal().getName();
+    }
+
     @Override public List<String> getRoles() {
         return identity.getRoles().stream().toList();
     }
@@ -65,7 +73,7 @@ public class UserServiceImpl implements UserService {
         }
         backend.get().removeUser(username);
         removeLocalUser(username);
-        Log.infov("{0} removed user {1}", identity.getPrincipal().getName(), username);
+        Log.infov("{0} removed user {1}", getUsername(), username);
     }
 
     @Override public List<String> getTeams() {
@@ -119,14 +127,14 @@ public class UserServiceImpl implements UserService {
     @Override public void addTeam(String unsafeTeam) {
         String team = validateTeamName(unsafeTeam);
         backend.get().addTeam(team);
-        Log.infov("{0} created team {1}", identity.getPrincipal().getName(), team);
+        Log.infov("{0} created team {1}", getUsername(), team);
     }
 
     @RolesAllowed(Roles.ADMIN)
     @Override public void deleteTeam(String unsafeTeam) {
         String team = validateTeamName(unsafeTeam);
         backend.get().deleteTeam(team);
-        Log.infov("{0} deleted team {1}", identity.getPrincipal().getName(), team);
+        Log.infov("{0} deleted team {1}", getUsername(), team);
     }
 
     @RolesAllowed(Roles.ADMIN)
@@ -163,7 +171,7 @@ public class UserServiceImpl implements UserService {
         }
         String newPassword = new SecureRandom().ints(RANDOM_PASSWORD_LENGTH, '0', 'z' + 1).collect(StringBuilder::new, StringBuilder::appendCodePoint, StringBuilder::append).toString();
         UserInfo.<UserInfo>findByIdOptional(username).orElseThrow(() -> ServiceException.notFound(format("Username {0} not found", username))).setPassword(newPassword);
-        Log.infov("{0} reset password of user {1}", identity.getPrincipal().getName(), username);
+        Log.infov("{0} reset password of user {1}", getUsername(), username);
         return newPassword;
     }
 
@@ -241,57 +249,53 @@ public class UserServiceImpl implements UserService {
 
     @Transactional
     @WithRoles(addUsername = true)
-    @Override public String newAuthenticationToken(HorreumAuthenticationTokenRequest tokenRequest) {
-        if (tokenRequest.expiration < -1) { // allow creating a token for yesterday for testing purposes
-            throw ServiceException.badRequest("Token expiration time is negative");
-        } else if (tokenRequest.expiration > 1000) {
-            throw ServiceException.badRequest("Token expiration time is too long");
+    @Override public String newApiKey(ApiKeyRequest request) {
+        if (request.expiration < -1) { // allow creating a key for yesterday for testing purposes
+            throw ServiceException.badRequest("API key expiration time is negative");
+        } else if (request.expiration > 1000) {
+            throw ServiceException.badRequest("API key expiration time is too long");
         }
         UserInfo userInfo = currentUser();
 
-        AuthenticationToken authToken = new AuthenticationToken(tokenRequest);
-        authToken.user = userInfo;
-        userInfo.authenticationTokens.add(authToken);
-        authToken.persist();
+        ApiKey newKey = new ApiKey(request);
+        newKey.user = userInfo;
+        userInfo.apiKeys.add(newKey);
+        newKey.persist();
         userInfo.persist();
 
-        Log.infov("{0} created authentication token {1} valid until {2}", identity.getPrincipal().getName(), tokenRequest.name, LocalDate.now().plusDays(tokenRequest.expiration));
-        return authToken.getTokenString();
+        Log.infov("{0} created API key \"{1}\" valid until {2}", getUsername(), request.name, LocalDate.now().plusDays(request.expiration));
+        return newKey.keyString();
     }
 
     @Transactional
     @WithRoles(extras = Roles.HORREUM_SYSTEM)
-    @Override public List<HorreumAuthenticationToken> authenticationTokens() {
-        return currentUser().authenticationTokens.stream()
-                                                 .filter(t -> !t.isOld())
-                                                 .sorted()
-                                                 .map(AuthenticationToken::toHorreumAuthenticationToken)
-                                                 .toList();
+    @Override public List<ApiKeyResponse> apiKeys() {
+        return currentUser().apiKeys.stream()
+                                    .filter(t -> !t.isOld())
+                                    .sorted()
+                                    .map(ApiKey::toResponse)
+                                    .toList();
     }
 
     @Transactional
     @WithRoles(addUsername = true)
-    @Override public void revokeAuthenticationToken(long tokenId) {
-        AuthenticationToken token = AuthenticationToken.<AuthenticationToken>findByIdOptional(tokenId).orElseThrow(() -> ServiceException.notFound(format("Token with id {0} not found", tokenId)));
-        token.revoke();
-        Log.infov("{0} revoked authentication token {1}", identity.getPrincipal().getName(), token.getName());
+    @Override public void revokeApiKey(long keyId) {
+        ApiKey key = ApiKey.<ApiKey>findByIdOptional(keyId).orElseThrow(() -> ServiceException.notFound(format("Key with id {0} not found", keyId)));
+        key.revoke();
+        Log.infov("{0} revoked API key \"{1}\"", getUsername(), key.getName());
     }
 
     @Transactional
     @WithRoles(addUsername = true)
-    @Override public void renewAuthenticationToken(long tokenId, long expiration) {
+    @Override public void renewApiKey(long keyId, long expiration) {
         if (expiration < 0) {
-            throw ServiceException.badRequest("Token expiration time is negative");
+            throw ServiceException.badRequest("Key expiration time is negative");
         } else if (expiration > 100) {
-            throw ServiceException.badRequest("Token expiration time is too long");
+            throw ServiceException.badRequest("Key expiration time is too long");
         }
-        AuthenticationToken token = AuthenticationToken.<AuthenticationToken>findByIdOptional(tokenId).orElseThrow(() -> ServiceException.notFound(format("Token with id {0} not found", tokenId)));
-        token.renew(expiration);
-        Log.infov("{0} renewed authentication token {1} until {2}", identity.getPrincipal().getName(), token.getName(), LocalDate.now().plusDays(expiration));
-    }
-
-    private UserInfo currentUser() {
-        return UserInfo.<UserInfo>findByIdOptional(identity.getPrincipal().getName()).orElseThrow(() -> ServiceException.notFound(format("Username {0} not found", identity.getPrincipal().getName())));
+        ApiKey key = ApiKey.<ApiKey>findByIdOptional(keyId).orElseThrow(() -> ServiceException.notFound(format("Key with id {0} not found", keyId)));
+        key.renew(expiration);
+        Log.infov("{0} renewed API key \"{1}\" until {2}", getUsername(), key.getName(), LocalDate.now().plusDays(expiration));
     }
 
     // --- //

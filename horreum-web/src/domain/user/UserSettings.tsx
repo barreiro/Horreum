@@ -21,7 +21,7 @@ import {
     Form,
     FormGroup,
     PageSection,
-    Spinner, 
+    Spinner,
     EmptyStateHeader,
     Tab,
 } from "@patternfly/react-core"
@@ -35,8 +35,7 @@ import ManagedTeams from "./ManagedTeams"
 import {AppContext} from "../../context/appContext";
 import {AppContextType} from "../../context/@types/appContextTypes";
 import ManageMachineAccounts from "./MachineAccounts";
-import AuthenticationTokens from "./AuthentcationTokens";
-
+import ApiKeys from "./ApiKeys";
 
 export const UserProfileLink = () => {
     const profile = useSelector(userProfileSelector)
@@ -212,8 +211,8 @@ export function UserSettings() {
                                 </EmptyState>
                             )}
                         </SavedTab>
-                        <Tab title="Authentication tokens" eventKey="authentication-tokens">
-                            <AuthenticationTokens/>
+                        <Tab title="API keys" eventKey="api-keys">
+                            <ApiKeys/>
                         </Tab>
                         {managedTeams.length > 0 ? (
                             <SavedTab
