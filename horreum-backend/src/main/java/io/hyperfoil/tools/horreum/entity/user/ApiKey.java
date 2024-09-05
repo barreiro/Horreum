@@ -93,6 +93,14 @@ public class ApiKey extends PanacheEntityBase implements Comparable<ApiKey> {
         return name;
     }
 
+    public LocalDate getCreation() {
+        return creation;
+    }
+
+    public LocalDate getAccess() {
+        return access;
+    }
+    
     public String keyString() {
         StringBuilder builder = new StringBuilder(50);
         builder.append("H");

@@ -6,8 +6,10 @@ import io.hyperfoil.tools.horreum.entity.user.UserInfo;
 import io.hyperfoil.tools.horreum.server.WithRoles;
 import io.hyperfoil.tools.horreum.svc.user.UserBackEnd;
 import io.quarkus.logging.Log;
+import io.quarkus.scheduler.Scheduled;
 import io.quarkus.security.Authenticated;
 import io.quarkus.security.identity.SecurityIdentity;
+import jakarta.annotation.security.PermitAll;
 import jakarta.annotation.security.RolesAllowed;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Instance;
@@ -27,12 +29,14 @@ import static java.util.Collections.emptyList;
 @Authenticated
 @ApplicationScoped
 public class UserServiceImpl implements UserService {
-    
+
     private static final int RANDOM_PASSWORD_LENGTH = 15;
 
     @Inject SecurityIdentity identity;
 
     @Inject Instance<UserBackEnd> backend;
+
+    @Inject NotificationServiceImpl notificationServiceimpl;
 
     private UserInfo currentUser() {
         return UserInfo.<UserInfo>findByIdOptional(getUsername()).orElseThrow(() -> ServiceException.notFound(format("Username {0} not found", getUsername())));
@@ -46,12 +50,12 @@ public class UserServiceImpl implements UserService {
         return identity.getRoles().stream().toList();
     }
 
-    @RolesAllowed({Roles.MANAGER, Roles.ADMIN})
+    @RolesAllowed({ Roles.MANAGER, Roles.ADMIN })
     @Override public List<UserData> searchUsers(String query) {
         return backend.get().searchUsers(query);
     }
 
-    @RolesAllowed({Roles.MANAGER, Roles.ADMIN})
+    @RolesAllowed({ Roles.MANAGER, Roles.ADMIN })
     @Override public List<UserData> info(List<String> usernames) {
         return backend.get().info(usernames);
     }
@@ -221,7 +225,7 @@ public class UserServiceImpl implements UserService {
 
     /**
      * The user info that is always local, no matter what is the backend
-     */  
+     */
     @Transactional
     @WithRoles(fromParams = FirstParameter.class)
     void createLocalUser(String username, String defaultTeam, String password) {
@@ -298,17 +302,29 @@ public class UserServiceImpl implements UserService {
         Log.infov("{0} renewed API key \"{1}\" until {2}", getUsername(), key.getName(), LocalDate.now().plusDays(expiration));
     }
 
+    @PermitAll
+    @Transactional
+    @WithRoles(extras = Roles.HORREUM_SYSTEM)
+    @Scheduled(every = "P1d") // daily
+    public void apiKeyNotifications() {
+        LocalDate now = LocalDate.now();
+        for (long expiration : List.of(7, 2, 1, 0, -1)) {
+            ApiKey.<ApiKey>stream("expiration = ?1 and revoked = false", now.plusDays(expiration))
+                  .forEach(key -> notificationServiceimpl.notifyApiKeyExpiration(key, expiration));
+        }
+    }
+
     // --- //
 
     public static final class FirstParameter implements Function<Object[], String[]> {
         @Override public String[] apply(Object[] objects) {
-            return new String[] {(String) objects[0]};
+            return new String[] { (String) objects[0] };
         }
     }
 
     public static final class SecondParameter implements Function<Object[], String[]> {
         @Override public String[] apply(Object[] objects) {
-            return new String[] {(String) objects[1]};
+            return new String[] { (String) objects[1] };
         }
     }
 }

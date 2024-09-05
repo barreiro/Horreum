@@ -5,6 +5,7 @@ import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.Date;
 
 import jakarta.enterprise.context.ApplicationScoped;
@@ -43,6 +44,9 @@ public class EmailPlugin implements NotificationPlugin {
 
    @Location("expected_run_notification_email")
    Template expectedRunNotificationEmail;
+
+   @Location("api_key_expiration_email")
+   Template apiKeyExpirationEmail;
 
    @Inject
    ReactiveMailer mailer;
@@ -135,6 +139,20 @@ public class EmailPlugin implements NotificationPlugin {
                .data("expectedBy", expectedBy)
                .data("backlink", backlink)
                .render();
+         mailer.send(Mail.withHtml(data, subject, content)).await().atMost(sendMailTimeout);
+         log.debug("Sending mail: "+content);
+      }
+
+      @Override public void notifyApiKeyExpiration(String keyName, LocalDate creation, LocalDate lastAccess, long expiration) {
+         String subject = String.format("%s API key \"%s\" %s", subjectPrefix, keyName, expiration == -1 ? "EXPIRED" : "about to expire");
+         String content = apiKeyExpirationEmail
+                 .data("baseUrl", baseUrl)
+                 .data("username", username)
+                 .data("keyName", keyName)
+                 .data("creation", creation)
+                 .data("lastAccess", lastAccess)
+                 .data("expiration", expiration)
+                 .render();
          mailer.send(Mail.withHtml(data, subject, content)).await().atMost(sendMailTimeout);
          log.debug("Sending mail: "+content);
       }
