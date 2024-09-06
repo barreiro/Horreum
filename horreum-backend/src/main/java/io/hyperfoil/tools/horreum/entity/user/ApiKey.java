@@ -59,7 +59,7 @@ public class ApiKey extends PanacheEntityBase implements Comparable<ApiKey> {
 
     private final String hash;
 
-    private final String name;
+    private String name;
 
     @Enumerated
     public final UserService.KeyType type;
@@ -91,6 +91,10 @@ public class ApiKey extends PanacheEntityBase implements Comparable<ApiKey> {
 
     public String getName() {
         return name;
+    }
+
+    public void setName(String newName) {
+        name = newName;
     }
 
     public LocalDate getCreation() {

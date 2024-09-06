@@ -37,6 +37,9 @@ export default function ApiKeys() {
     const [newKeyExpiration, setNewKeyExpiration] = useState<string>(defaultExpiration)
     const [newKeyValue, setNewKeyValue] = useState<string>()
 
+    const [renameKeyId, setRenameKeyId] = useState<number>()
+    const [renameKeyName, setRenameKeyName] = useState<string>()
+
     const [renewKeyId, setRenewKeyId] = useState<number>()
     const [renewKeyExpiration, setRenewKeyExpiration] = useState<number>(90)
 
@@ -175,6 +178,12 @@ export default function ApiKeys() {
                             <Td isActionCell>
                                 <ActionsColumn items={key.isRevoked ? [] : [
                                     {
+                                        title: 'Rename',
+                                        onClick: () => {
+                                            setRenameKeyId(key.id)
+                                        }
+                                    },
+                                    {
                                         title: 'Renew',
                                         isDisabled: !(key.expiration && daysTo(key.expiration) < 7), // only allow to renew in last 7 days
                                         onClick: () => {
@@ -230,8 +239,8 @@ export default function ApiKeys() {
                 ]}
             >
                 <Form isHorizontal>
-                    <FormGroup isRequired label="Key Name" fieldId="new-api-key-name">
-                        <TextInput isRequired value={newKeyName} onChange={(_event, val) => setNewKeyName(val)}/>
+                    <FormGroup isRequired label="Key name" fieldId="new-api-key-name">
+                        <TextInput isRequired value={newKeyName} onChange={(_, val) => setNewKeyName(val)}/>
                     </FormGroup>
                     <FormGroup label="Expiration date" fieldId="new-api-key-expiration">
                         <DatePicker value={newKeyExpiration}
@@ -256,11 +265,39 @@ export default function ApiKeys() {
                 <ClipboardCopy isReadOnly>{newKeyValue}</ClipboardCopy>
             </Modal>
             <Modal
+                isOpen={renameKeyId != undefined}
+                title={"Rename API key"}
+                aria-label="rename-api-key"
+                variant="small"
+                onClose={() => setRenameKeyId(undefined)}
+                actions={[
+                    <Button
+                        onClick={() => {
+                            if (renameKeyId) {
+                                userApi.renameApiKey(renameKeyId, renameKeyName)
+                                    .then(() => void alerting.dispatchInfo("API_KEY_RENAMED", "API key renamed", "API key was successfully renamed", 3000))
+                                    .catch(error => alerting.dispatchError(error, "API_KEY_NOT_RENAMED", "Failed to rename API key"))
+                                    .finally(() => setRenameKeyId(undefined))
+                                    .then(() => void refreshApiKeys())
+                            }
+                        }}
+                    >
+                        Rename
+                    </Button>,
+                    <Button variant="secondary" onClick={() => setRenameKeyId(undefined)}>Cancel</Button>,
+                ]}>
+                <Form isHorizontal>
+                    <FormGroup isRequired label="Key name" fieldId="rennew-api-key-name">
+                        <TextInput isRequired onChange={(_, val) => setRenameKeyName(val)}/>
+                    </FormGroup>
+                </Form>
+            </Modal>
+            <Modal
                 isOpen={renewKeyId != undefined}
                 title={"Renew API key"}
                 aria-label="renew-api-key"
                 variant="small"
-                onClose={() => setNewKeyValue(undefined)}
+                onClose={() => setRenewKeyId(undefined)}
                 actions={[
                     <Button
                         onClick={() => {

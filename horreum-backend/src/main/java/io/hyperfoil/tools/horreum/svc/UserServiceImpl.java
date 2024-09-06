@@ -254,7 +254,8 @@ public class UserServiceImpl implements UserService {
     @Transactional
     @WithRoles(addUsername = true)
     @Override public String newApiKey(ApiKeyRequest request) {
-        if (request.expiration < -1) { // allow creating a key for yesterday for testing purposes
+        validateApiKeyName(request.name);
+        if (request.expiration < 0) {
             throw ServiceException.badRequest("API key expiration time is negative");
         } else if (request.expiration > 1000) {
             throw ServiceException.badRequest("API key expiration time is too long");
@@ -302,6 +303,16 @@ public class UserServiceImpl implements UserService {
         Log.infov("{0} renewed API key \"{1}\" until {2}", getUsername(), key.getName(), LocalDate.now().plusDays(expiration));
     }
 
+    @Transactional
+    @WithRoles(addUsername = true)
+    @Override public void renameApiKey(long keyId, String newName) {
+        validateApiKeyName(newName);
+        ApiKey key = ApiKey.<ApiKey>findByIdOptional(keyId).orElseThrow(() -> ServiceException.notFound(format("Key with id {0} not found", keyId)));
+        String oldName = key.getName();
+        key.setName(newName);
+        Log.infov("{0} renamed API key \"{1}\" to \"{2}\"", getUsername(), oldName, newName);
+    }
+
     @PermitAll
     @Transactional
     @WithRoles(extras = Roles.HORREUM_SYSTEM)
@@ -311,6 +322,12 @@ public class UserServiceImpl implements UserService {
         for (long expiration : List.of(7, 2, 1, 0, -1)) {
             ApiKey.<ApiKey>stream("expiration = ?1 and revoked = false", now.plusDays(expiration))
                   .forEach(key -> notificationServiceimpl.notifyApiKeyExpiration(key, expiration));
+        }
+    }
+
+    private void validateApiKeyName(String keyName) {
+        if (keyName.startsWith("horreum.")) {
+            throw ServiceException.badRequest("key names starting with 'horreum.' are reserved for internal use");
         }
     }
 

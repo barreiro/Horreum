@@ -557,13 +557,19 @@ public abstract class UserServiceAbstractTest {
             assertFalse(keys.get(0).isExpired);
             assertFalse(keys.get(0).isRevoked);
 
+            // rename key
+            assertThrows(ServiceException.class, () -> userService.renameApiKey(keys.get(0).id, "horreum.key"));
+            userService.renameApiKey(keys.get(0).id, "Test key new name");
+            assertEquals("Test key new name", userService.apiKeys().get(0).name);
+                       
             // revoke key
             userService.revokeApiKey(keys.get(0).id);
             assertTrue(userService.apiKeys().get(0).isRevoked);
 
             // create key
-            String expiredKey = userService.newApiKey(new UserService.ApiKeyRequest("Expired key", -1, USER));
-            assertFalse(expiredKey.length() < 32); // key should be big enough
+            String expiredKey = userService.newApiKey(new UserService.ApiKeyRequest("Expired key", 0, USER));
+            long expiredKeyId = userService.apiKeys().stream().filter(k -> k.id != keys.get(0).id).findFirst().orElseThrow().id;
+            expireApiKey(expiredKeyId);
 
             // one expired key
             List <UserService.ApiKeyResponse> twoKeys = userService.apiKeys();
@@ -573,6 +579,11 @@ public abstract class UserServiceAbstractTest {
             // a key deep in the past
             assertThrows(ServiceException.class, () -> userService.newApiKey(new UserService.ApiKeyRequest("Very old key", -10, USER)));
         });
+    }
+
+    @Transactional
+    void expireApiKey(long keyId) {
+        ApiKey.<ApiKey>findById(keyId).renew(-2);
     }
 
 }

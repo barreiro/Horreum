@@ -139,6 +139,11 @@ public interface UserService {
    @Blocking
    void renewApiKey(@PathParam("id") long keyId, @RequestBody long expiration);
 
+   @PUT
+   @Path("/apikey/{id}/rename")
+   @Blocking
+   void renameApiKey(@PathParam("id") long keyId, @RequestBody String newName);
+
    // this is a simplified copy of org.keycloak.representations.idm.UserRepresentation
    class UserData {
       @NotNull
