@@ -29,7 +29,7 @@ public class ApiKey extends PanacheEntityBase implements Comparable<ApiKey> {
 
     // old authentication tokens are not listed and can't be renewed either
     // they are kept around to prevent re-use
-    public static long OLD_EXPIRATION_DAYS = 7;
+    public static long NUMBER_OF_DEATH_ROW_DAYS = 7;
 
     private static MessageDigest digest;
 
@@ -55,56 +55,70 @@ public class ApiKey extends PanacheEntityBase implements Comparable<ApiKey> {
     public UserInfo user;
 
     @Transient
-    private final UUID token;
+    private final UUID randomnessSource;
 
     private final String hash;
 
-    private String name;
+    public String name;
 
     @Enumerated
     public final UserService.KeyType type;
 
-    private LocalDate creation, access, expiration;
+    public LocalDate creation, access, expiration;
 
     private boolean revoked;
 
     public ApiKey() {
-        token = null;
+        randomnessSource = null;
         hash = null;
         name = null;
         type = UserService.KeyType.USER;
     }
 
-    public ApiKey(UserService.ApiKeyRequest request) {
-        this(request.name, request.expiration, request.type);
+    public ApiKey(UserService.ApiKeyRequest request, LocalDate creation) {
+        this(request.name, request.expiration, request.type, creation);
     }
 
-    public ApiKey(String name, long days, UserService.KeyType type) {
-        token = UUID.randomUUID();
+    public ApiKey(String name, long days, UserService.KeyType type, LocalDate creationDate) {
+        randomnessSource = UUID.randomUUID();
         this.name = name;
         this.type = type;
         hash = computeHash(keyString());
-        creation = LocalDate.now();
-        expiration = LocalDate.now().plusDays(days);
+        creation = creationDate;
+        expiration = creationDate.plusDays(days);
         revoked = false;
     }
 
-    public String getName() {
-        return name;
+    public boolean isAlive(LocalDate givenDay) {
+        return expiration.plusDays(NUMBER_OF_DEATH_ROW_DAYS).isAfter(givenDay);
     }
 
-    public void setName(String newName) {
-        name = newName;
+    public boolean isExpired(LocalDate givenDay) {
+        return givenDay.isAfter(expiration);
     }
 
-    public LocalDate getCreation() {
-        return creation;
+    public boolean isValid(LocalDate givenDay) {
+        return !isRevoked() && !isExpired(givenDay);
     }
 
-    public LocalDate getAccess() {
-        return access;
+    public boolean isRevoked() {
+        return revoked;
     }
-    
+
+    public void revoke(LocalDate revocationDay) {
+        revoked = true;
+        expiration = revocationDay;
+    }
+
+    public void renew(LocalDate newExpiration) {
+//        if (isOld()) {
+//            throw new IllegalStateException("Token has expired long ago and cannot be renewed");
+//        }
+        expiration = newExpiration;
+    }
+
+    // --- //
+
     public String keyString() {
         StringBuilder builder = new StringBuilder(50);
         builder.append("H");
@@ -116,56 +130,21 @@ public class ApiKey extends PanacheEntityBase implements Comparable<ApiKey> {
                 builder.append("UNK");
         }
         builder.append("_");
-        builder.append(token.toString().replace("-", "_").toUpperCase()); // keep the dashes for quick validation of key format
+        builder.append(randomnessSource.toString().replace("-", "_").toUpperCase()); // keep the dashes for quick validation of key format
         return builder.toString();
     }
 
-    public boolean isOld() {
-        return expiration.plusDays(OLD_EXPIRATION_DAYS).isBefore(LocalDate.now());
-    }
-
-    public boolean isExpired() {
-        return LocalDate.now().isAfter(expiration);
-    }
-
-    public boolean isValid() {
-        if (isRevoked() || isExpired()) {
-            return false;
-        } else {
-            access = LocalDate.now();
-            return true;
-        }
-    }
-
-    public boolean isRevoked() {
-        return revoked;
-    }
-
-    public void revoke() {
-        revoked = true;
-        expiration = LocalDate.now();
-    }
-
-    public void renew(long days) {
-        if (isOld()) {
-            throw new IllegalStateException("Token has expired long ago and cannot be renewed");
-        }
-        expiration = LocalDate.now().plusDays(days);
-    }
-
-    // --- //
-
-    private static String computeHash(String key) {
-        return Base64.getEncoder().encodeToString(digest.digest(key.getBytes()));
-    }
-
-    public static Optional<ApiKey> findValid(String key) {
+    public static Optional<ApiKey> find(String key) {
         // validate key structure before computing hash
         if (key.startsWith("H") && Stream.of(4,13,18,23,28).allMatch(i -> key.charAt(i) == '_')) {
-            return io.hyperfoil.tools.horreum.entity.user.ApiKey.<ApiKey>find("hash", computeHash(key)).firstResultOptional().filter(ApiKey::isValid);
+            return ApiKey.<ApiKey>find("hash", computeHash(key)).firstResultOptional();
         }  else {
             return Optional.empty();
         }
+    }
+
+    private static String computeHash(String key) {
+        return Base64.getEncoder().encodeToString(digest.digest(key.getBytes()));
     }
 
     // --- //
@@ -191,7 +170,7 @@ public class ApiKey extends PanacheEntityBase implements Comparable<ApiKey> {
         token.creation = creation;
         token.access = access;
         token.expiration = expiration;
-        token.isExpired = isExpired();
+        token.isExpired = isExpired(LocalDate.now());
         token.isRevoked = isRevoked();
         return token;
     }

@@ -21,6 +21,7 @@ import jakarta.ws.rs.core.Response;
 import org.jboss.logging.Logger;
 import org.junit.jupiter.api.Test;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -549,7 +550,7 @@ public abstract class UserServiceAbstractTest {
             // create key
             String key = userService.newApiKey(new UserService.ApiKeyRequest("Test key", 10, USER));
             assertFalse(key.length() < 32); // key should be big enough
-            assertTrue(ApiKey.findValid(key).isPresent());
+            assertTrue(ApiKey.find(key).isPresent()); // is persisted
 
             // one key
             List <UserService.ApiKeyResponse> keys = userService.apiKeys();
@@ -583,7 +584,7 @@ public abstract class UserServiceAbstractTest {
 
     @Transactional
     void expireApiKey(long keyId) {
-        ApiKey.<ApiKey>findById(keyId).renew(-2);
+        ApiKey.<ApiKey>findById(keyId).renew(LocalDate.now().minusDays(2));
     }
 
 }

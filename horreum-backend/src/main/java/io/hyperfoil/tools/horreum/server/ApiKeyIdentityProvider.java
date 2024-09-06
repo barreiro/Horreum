@@ -1,6 +1,7 @@
 package io.hyperfoil.tools.horreum.server;
 
 import io.hyperfoil.tools.horreum.entity.user.ApiKey;
+import io.hyperfoil.tools.horreum.svc.TimeService;
 import io.quarkus.security.identity.AuthenticationRequestContext;
 import io.quarkus.security.identity.IdentityProvider;
 import io.quarkus.security.identity.SecurityIdentity;
@@ -8,6 +9,7 @@ import io.quarkus.security.runtime.QuarkusPrincipal;
 import io.quarkus.security.runtime.QuarkusSecurityIdentity;
 import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
 
 /**
@@ -15,18 +17,22 @@ import jakarta.transaction.Transactional;
  */
 @ApplicationScoped public class ApiKeyIdentityProvider implements IdentityProvider<ApiKeyAuthenticationMechanism.Request> {
 
+    @Inject TimeService timeService;
+
     @Override public Class<ApiKeyAuthenticationMechanism.Request> getRequestType() {
         return ApiKeyAuthenticationMechanism.Request.class;
     }
 
     @Transactional
     @Override public Uni<SecurityIdentity> authenticate(ApiKeyAuthenticationMechanism.Request request, AuthenticationRequestContext context) {
-        return context.runBlocking(() -> ApiKey.findValid(request.getKey()).map(ApiKeyIdentityProvider::from).orElse(null));
+        return context.runBlocking(() -> ApiKey.find(request.getKey()).filter(k -> k.isValid(timeService.today())).map(this::identityFromKey).orElse(null));
     }
 
-    private static SecurityIdentity from(ApiKey token) {
+    private SecurityIdentity identityFromKey(ApiKey key) {
+        key.access = timeService.today();
+
         // roles will be populated in RolesAugmentor
-        return QuarkusSecurityIdentity.builder().setPrincipal(new QuarkusPrincipal(token.user.username)).build();
+        return QuarkusSecurityIdentity.builder().setPrincipal(new QuarkusPrincipal(key.user.username)).build();
     }
 
 }

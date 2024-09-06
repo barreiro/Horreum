@@ -17,7 +17,6 @@ import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
 
 import java.security.SecureRandom;
-import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -35,6 +34,8 @@ public class UserServiceImpl implements UserService {
     @Inject SecurityIdentity identity;
 
     @Inject Instance<UserBackEnd> backend;
+
+    @Inject TimeService timeService;
 
     @Inject NotificationServiceImpl notificationServiceimpl;
 
@@ -262,13 +263,13 @@ public class UserServiceImpl implements UserService {
         }
         UserInfo userInfo = currentUser();
 
-        ApiKey newKey = new ApiKey(request);
+        ApiKey newKey = new ApiKey(request, timeService.today());
         newKey.user = userInfo;
         userInfo.apiKeys.add(newKey);
         newKey.persist();
         userInfo.persist();
 
-        Log.infov("{0} created API key \"{1}\" valid until {2}", getUsername(), request.name, LocalDate.now().plusDays(request.expiration));
+        Log.infov("{0} created API key \"{1}\" valid until {2}", getUsername(), request.name, timeService.today().plusDays(request.expiration));
         return newKey.keyString();
     }
 
@@ -276,7 +277,7 @@ public class UserServiceImpl implements UserService {
     @WithRoles(extras = Roles.HORREUM_SYSTEM)
     @Override public List<ApiKeyResponse> apiKeys() {
         return currentUser().apiKeys.stream()
-                                    .filter(t -> !t.isOld())
+                                    .filter(t -> t.isAlive(timeService.today()))
                                     .sorted()
                                     .map(ApiKey::toResponse)
                                     .toList();
@@ -286,8 +287,8 @@ public class UserServiceImpl implements UserService {
     @WithRoles(addUsername = true)
     @Override public void revokeApiKey(long keyId) {
         ApiKey key = ApiKey.<ApiKey>findByIdOptional(keyId).orElseThrow(() -> ServiceException.notFound(format("Key with id {0} not found", keyId)));
-        key.revoke();
-        Log.infov("{0} revoked API key \"{1}\"", getUsername(), key.getName());
+        key.revoke(timeService.today());
+        Log.infov("{0} revoked API key \"{1}\"", getUsername(), key.name);
     }
 
     @Transactional
@@ -299,8 +300,8 @@ public class UserServiceImpl implements UserService {
             throw ServiceException.badRequest("Key expiration time is too long");
         }
         ApiKey key = ApiKey.<ApiKey>findByIdOptional(keyId).orElseThrow(() -> ServiceException.notFound(format("Key with id {0} not found", keyId)));
-        key.renew(expiration);
-        Log.infov("{0} renewed API key \"{1}\" until {2}", getUsername(), key.getName(), LocalDate.now().plusDays(expiration));
+        key.renew(timeService.today().plusDays(expiration));
+        Log.infov("{0} renewed API key \"{1}\" until {2}", getUsername(), key.name, timeService.today().plusDays(expiration));
     }
 
     @Transactional
@@ -308,8 +309,8 @@ public class UserServiceImpl implements UserService {
     @Override public void renameApiKey(long keyId, String newName) {
         validateApiKeyName(newName);
         ApiKey key = ApiKey.<ApiKey>findByIdOptional(keyId).orElseThrow(() -> ServiceException.notFound(format("Key with id {0} not found", keyId)));
-        String oldName = key.getName();
-        key.setName(newName);
+        String oldName = key.name;
+        key.name = newName;
         Log.infov("{0} renamed API key \"{1}\" to \"{2}\"", getUsername(), oldName, newName);
     }
 
@@ -318,9 +319,8 @@ public class UserServiceImpl implements UserService {
     @WithRoles(extras = Roles.HORREUM_SYSTEM)
     @Scheduled(every = "P1d") // daily
     public void apiKeyNotifications() {
-        LocalDate now = LocalDate.now();
         for (long expiration : List.of(7, 2, 1, 0, -1)) {
-            ApiKey.<ApiKey>stream("expiration = ?1 and revoked = false", now.plusDays(expiration))
+            ApiKey.<ApiKey>stream("expiration = ?1 AND revoked = false", timeService.today().plusDays(expiration))
                   .forEach(key -> notificationServiceimpl.notifyApiKeyExpiration(key, expiration));
         }
     }
