@@ -19,5 +19,5 @@ public abstract class Notification {
    public abstract void notifyMissingDataset(String testName, int testId, String ruleName, long maxStaleness, Instant lastTimestamp);
    public abstract void notifyMissingValues(String testName, String fingerprint, MissingValuesEvent missing);
    public abstract void notifyExpectedRun(String testName, int testId, long before, String expectedBy, String backlink);
-   public abstract void notifyApiKeyExpiration(String keyName, LocalDate creation, LocalDate lastAccess, long expiration);
+   public abstract void notifyApiKeyExpiration(String keyName, LocalDate creation, LocalDate lastAccess, long toExpiration);
 }

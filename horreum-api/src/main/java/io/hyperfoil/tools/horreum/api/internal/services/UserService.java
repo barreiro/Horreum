@@ -130,19 +130,15 @@ public interface UserService {
    List<ApiKeyResponse> apiKeys();
 
    @PUT
+   @Path("/apikey/{id}/rename")
+   @Consumes("text/plain")
+   @Blocking
+   void renameApiKey(@PathParam("id") long keyId, @RequestBody String newName);
+
+   @PUT
    @Path("/apikey/{id}/revoke")
    @Blocking
    void revokeApiKey(@PathParam("id") long keyId);
-
-   @PUT
-   @Path("/apikey/{id}/renew")
-   @Blocking
-   void renewApiKey(@PathParam("id") long keyId, @RequestBody long expiration);
-
-   @PUT
-   @Path("/apikey/{id}/rename")
-   @Blocking
-   void renameApiKey(@PathParam("id") long keyId, @RequestBody String newName);
 
    // this is a simplified copy of org.keycloak.representations.idm.UserRepresentation
    class UserData {
@@ -184,15 +180,13 @@ public interface UserService {
 
    class ApiKeyRequest {
       public String name;
-      public long expiration;
       public KeyType type;
 
       public ApiKeyRequest() {
       }
 
-      public ApiKeyRequest(String name, long expiration, KeyType type) {
+      public ApiKeyRequest(String name, KeyType type) {
          this.name = name;
-         this.expiration = expiration;
          this.type = type;
       }
    }
@@ -203,8 +197,8 @@ public interface UserService {
       public KeyType type;
       public LocalDate creation;
       public LocalDate access;
-      public LocalDate expiration;
       public boolean isExpired;
       public boolean isRevoked;
+      public long expiration;
    }
 }

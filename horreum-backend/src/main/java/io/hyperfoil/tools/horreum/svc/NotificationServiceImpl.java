@@ -9,7 +9,7 @@ import java.util.Map;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
-import io.hyperfoil.tools.horreum.entity.user.ApiKey;
+import io.hyperfoil.tools.horreum.entity.user.UserApiKey;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.security.PermitAll;
 import jakarta.annotation.security.RolesAllowed;
@@ -191,13 +191,13 @@ public class NotificationServiceImpl implements NotificationService {
    }
 
    @WithRoles(extras = Roles.HORREUM_SYSTEM)
-   public void notifyApiKeyExpiration(ApiKey key, long expiration) {
+   public void notifyApiKeyExpiration(UserApiKey key, long toExpiration) {
       NotificationSettingsDAO.<NotificationSettingsDAO>stream("name", key.user.username).forEach(notification -> {
          NotificationPlugin plugin = plugins.get(notification.method);
          if (plugin == null) {
             log.errorf("Cannot notify %s of API key expiration: no plugin for method %s", notification.name, notification.method);
          } else {
-            plugin.create(notification.name, notification.data).notifyApiKeyExpiration(key.name, key.creation, key.access, expiration);
+            plugin.create(notification.name, notification.data).notifyApiKeyExpiration(key.name, key.creation, key.access, toExpiration);
          }
       });
    }

@@ -8,6 +8,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Date;
 
+import io.hyperfoil.tools.horreum.entity.user.UserApiKey;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
@@ -143,15 +144,16 @@ public class EmailPlugin implements NotificationPlugin {
          log.debug("Sending mail: "+content);
       }
 
-      @Override public void notifyApiKeyExpiration(String keyName, LocalDate creation, LocalDate lastAccess, long expiration) {
-         String subject = String.format("%s API key \"%s\" %s", subjectPrefix, keyName, expiration == -1 ? "EXPIRED" : "about to expire");
+      @Override public void notifyApiKeyExpiration(String keyName, LocalDate creation, LocalDate lastAccess, long toExpiration) {
+         String subject = String.format("%s API key \"%s\" %s", subjectPrefix, keyName, toExpiration == -1 ? "EXPIRED" : "about to expire");
          String content = apiKeyExpirationEmail
                  .data("baseUrl", baseUrl)
                  .data("username", username)
                  .data("keyName", keyName)
                  .data("creation", creation)
                  .data("lastAccess", lastAccess)
-                 .data("expiration", expiration)
+                 .data("expiration", toExpiration)
+                 .data("limit", UserApiKey.EXPIRATION_DAYS)
                  .render();
          mailer.send(Mail.withHtml(data, subject, content)).await().atMost(sendMailTimeout);
          log.debug("Sending mail: "+content);

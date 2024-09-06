@@ -9,12 +9,16 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.NamedQueries;
+import jakarta.persistence.NamedQuery;
 import jakarta.persistence.SequenceGenerator;
+import jakarta.persistence.Table;
 import jakarta.persistence.Transient;
 
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.Base64;
 import java.util.Comparator;
 import java.util.Objects;
@@ -24,12 +28,20 @@ import java.util.stream.Stream;
 
 import static jakarta.persistence.GenerationType.SEQUENCE;
 
-@Entity(name = "userinfo_apikey")
-public class ApiKey extends PanacheEntityBase implements Comparable<ApiKey> {
+@Entity
+@Table(name = "userinfo_apikey")
+@NamedQueries({
+        @NamedQuery(name = "UserApiKey.access", query = "from UserApiKey where not revoked AND (access is null AND creation = ?1 OR access = ?1)"),
+        @NamedQuery(name = "UserApiKey.accessBefore", query = "from UserApiKey where not revoked AND (access is null AND creation < ?1 OR access < ?1)"),
+})
+public class UserApiKey extends PanacheEntityBase implements Comparable<UserApiKey> {
+
+    // number of days the key can remain unused before it expires
+    public static long EXPIRATION_DAYS = 30;
 
     // old authentication tokens are not listed and can't be renewed either
     // they are kept around to prevent re-use
-    public static long NUMBER_OF_DEATH_ROW_DAYS = 7;
+    public static long DEATH_ROW_DAYS = 7;
 
     private static MessageDigest digest;
 
@@ -64,57 +76,36 @@ public class ApiKey extends PanacheEntityBase implements Comparable<ApiKey> {
     @Enumerated
     public final UserService.KeyType type;
 
-    public LocalDate creation, access, expiration;
+    public LocalDate creation, access;
 
-    private boolean revoked;
+    public boolean revoked;
 
-    public ApiKey() {
+    public UserApiKey() {
         randomnessSource = null;
         hash = null;
         name = null;
         type = UserService.KeyType.USER;
     }
 
-    public ApiKey(UserService.ApiKeyRequest request, LocalDate creation) {
-        this(request.name, request.expiration, request.type, creation);
+    public UserApiKey(UserService.ApiKeyRequest request, LocalDate creation) {
+        this(request.name, request.type, creation);
     }
 
-    public ApiKey(String name, long days, UserService.KeyType type, LocalDate creationDate) {
+    public UserApiKey(String name, UserService.KeyType type, LocalDate creationDate) {
         randomnessSource = UUID.randomUUID();
         this.name = name;
         this.type = type;
         hash = computeHash(keyString());
         creation = creationDate;
-        expiration = creationDate.plusDays(days);
         revoked = false;
     }
 
     public boolean isAlive(LocalDate givenDay) {
-        return expiration.plusDays(NUMBER_OF_DEATH_ROW_DAYS).isAfter(givenDay);
+        return givenDay.isBefore((access == null ? creation : access).plusDays(EXPIRATION_DAYS + DEATH_ROW_DAYS));
     }
 
-    public boolean isExpired(LocalDate givenDay) {
-        return givenDay.isAfter(expiration);
-    }
-
-    public boolean isValid(LocalDate givenDay) {
-        return !isRevoked() && !isExpired(givenDay);
-    }
-
-    public boolean isRevoked() {
-        return revoked;
-    }
-
-    public void revoke(LocalDate revocationDay) {
-        revoked = true;
-        expiration = revocationDay;
-    }
-
-    public void renew(LocalDate newExpiration) {
-//        if (isOld()) {
-//            throw new IllegalStateException("Token has expired long ago and cannot be renewed");
-//        }
-        expiration = newExpiration;
+    private long toExpiration(LocalDate givenDay) {
+        return EXPIRATION_DAYS - ChronoUnit.DAYS.between(access == null ? creation : access, givenDay);
     }
 
     // --- //
@@ -134,11 +125,11 @@ public class ApiKey extends PanacheEntityBase implements Comparable<ApiKey> {
         return builder.toString();
     }
 
-    public static Optional<ApiKey> find(String key) {
+    public static Optional<UserApiKey> findOptional(String key) {
         // validate key structure before computing hash
-        if (key.startsWith("H") && Stream.of(4,13,18,23,28).allMatch(i -> key.charAt(i) == '_')) {
-            return ApiKey.<ApiKey>find("hash", computeHash(key)).firstResultOptional();
-        }  else {
+        if (key.startsWith("H") && Stream.of(4, 13, 18, 23, 28).allMatch(i -> key.charAt(i) == '_')) {
+            return UserApiKey.<UserApiKey>find("hash", computeHash(key)).firstResultOptional();
+        } else {
             return Optional.empty();
         }
     }
@@ -155,7 +146,7 @@ public class ApiKey extends PanacheEntityBase implements Comparable<ApiKey> {
         } else if (o == null || getClass() != o.getClass()) {
             return false;
         }
-        return Objects.equals(this.id, ((ApiKey) o).id) && Objects.equals(this.hash, ((ApiKey) o).hash);
+        return Objects.equals(this.id, ((UserApiKey) o).id) && Objects.equals(this.hash, ((UserApiKey) o).hash);
     }
 
     @Override public int hashCode() {
@@ -163,19 +154,19 @@ public class ApiKey extends PanacheEntityBase implements Comparable<ApiKey> {
     }
 
     public UserService.ApiKeyResponse toResponse() {
-        UserService.ApiKeyResponse token = new UserService.ApiKeyResponse();
-        token.id = id;
-        token.name = name;
-        token.type = type;
-        token.creation = creation;
-        token.access = access;
-        token.expiration = expiration;
-        token.isExpired = isExpired(LocalDate.now());
-        token.isRevoked = isRevoked();
-        return token;
+        UserService.ApiKeyResponse response = new UserService.ApiKeyResponse();
+        response.id = id;
+        response.name = name;
+        response.type = type;
+        response.creation = creation;
+        response.access = access;
+        response.isRevoked = revoked;
+        response.expiration = toExpiration(LocalDate.now());
+        response.isExpired = response.expiration < 0;
+        return response;
     }
 
-    @Override public int compareTo(ApiKey other) {
-        return Comparator.<ApiKey, LocalDate>comparing(a -> a.creation).thenComparing(a -> a.name).compare(this, other);
+    @Override public int compareTo(UserApiKey other) {
+        return Comparator.<UserApiKey, LocalDate>comparing(a -> a.creation).thenComparing(a -> a.name).compare(this, other);
     }
 }

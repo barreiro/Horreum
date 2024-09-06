@@ -68,7 +68,7 @@ public class HorreumClientIT implements QuarkusTestBeforeTestExecutionCallback, 
     @org.junit.jupiter.api.Test
     public void testApiKeys() {
         String keyName = "Test key";
-        String theKey = horreumClient.userService.newApiKey(new UserService.ApiKeyRequest(keyName, 10, USER));
+        String theKey = horreumClient.userService.newApiKey(new UserService.ApiKeyRequest(keyName, USER));
 
         try (HorreumClient apiClient = new HorreumClient.Builder()
                 .horreumUrl("http://localhost:".concat(System.getProperty("quarkus.http.test-port")))
@@ -88,7 +88,7 @@ public class HorreumClientIT implements QuarkusTestBeforeTestExecutionCallback, 
 
             horreumClient.userService.revokeApiKey(apiKey.id);
 
-            assertThrows(NotAuthorizedException.class, () -> apiClient.userService.getRoles());
+            assertThrows(NotAuthorizedException.class, apiClient.userService::getRoles);
         }
     }
 

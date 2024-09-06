@@ -4581,7 +4581,6 @@
             <column name="type" type="smallint"/>
             <column name="revoked" type="bool"/>
             <column name="creation" type="date"/>
-            <column name="expiration" type="date"/>
             <column name="access" type="date"/>
         </createTable>
         <createIndex tableName="userinfo_apikey" indexName="userinfo_apikey_hash">

@@ -1,6 +1,6 @@
 package io.hyperfoil.tools.horreum.server;
 
-import io.hyperfoil.tools.horreum.entity.user.ApiKey;
+import io.hyperfoil.tools.horreum.entity.user.UserApiKey;
 import io.hyperfoil.tools.horreum.svc.TimeService;
 import io.quarkus.security.identity.AuthenticationRequestContext;
 import io.quarkus.security.identity.IdentityProvider;
@@ -25,10 +25,10 @@ import jakarta.transaction.Transactional;
 
     @Transactional
     @Override public Uni<SecurityIdentity> authenticate(ApiKeyAuthenticationMechanism.Request request, AuthenticationRequestContext context) {
-        return context.runBlocking(() -> ApiKey.find(request.getKey()).filter(k -> k.isValid(timeService.today())).map(this::identityFromKey).orElse(null));
+        return context.runBlocking(() -> UserApiKey.findOptional(request.getKey()).filter(k -> !k.revoked).map(this::identityFromKey).orElse(null));
     }
 
-    private SecurityIdentity identityFromKey(ApiKey key) {
+    private SecurityIdentity identityFromKey(UserApiKey key) {
         key.access = timeService.today();
 
         // roles will be populated in RolesAugmentor

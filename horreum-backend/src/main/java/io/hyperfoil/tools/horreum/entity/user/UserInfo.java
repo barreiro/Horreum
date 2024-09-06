@@ -69,7 +69,7 @@ public class UserInfo extends PanacheEntityBase {
 
     @OneToMany(fetch = FetchType.EAGER, cascade = CascadeType.ALL, mappedBy = "user")
     @Cache(usage = CacheConcurrencyStrategy.READ_ONLY)
-    public Set<ApiKey> apiKeys;
+    public Set<UserApiKey> apiKeys;
 
     public UserInfo() {}
 

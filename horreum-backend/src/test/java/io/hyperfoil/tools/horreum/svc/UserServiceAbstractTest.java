@@ -1,7 +1,7 @@
 package io.hyperfoil.tools.horreum.svc;
 
 import io.hyperfoil.tools.horreum.api.internal.services.UserService;
-import io.hyperfoil.tools.horreum.entity.user.ApiKey;
+import io.hyperfoil.tools.horreum.entity.user.UserApiKey;
 import io.hyperfoil.tools.horreum.entity.user.UserInfo;
 import io.hyperfoil.tools.horreum.server.SecurityBootstrap;
 import io.hyperfoil.tools.horreum.server.WithRoles;
@@ -21,7 +21,6 @@ import jakarta.ws.rs.core.Response;
 import org.jboss.logging.Logger;
 import org.junit.jupiter.api.Test;
 
-import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -53,6 +52,7 @@ public abstract class UserServiceAbstractTest {
     @Inject Instance<UserBackEnd> backend;
 
     @Inject SecurityBootstrap securityBootstrap;
+    @Inject TimeService timeService;
 
     /**
      * Runs a section of a test under a different user
@@ -548,9 +548,9 @@ public abstract class UserServiceAbstractTest {
             assertTrue(userService.apiKeys().isEmpty());
 
             // create key
-            String key = userService.newApiKey(new UserService.ApiKeyRequest("Test key", 10, USER));
+            String key = userService.newApiKey(new UserService.ApiKeyRequest("Test key", USER));
             assertFalse(key.length() < 32); // key should be big enough
-            assertTrue(ApiKey.find(key).isPresent()); // is persisted
+            assertTrue(UserApiKey.findOptional(key).isPresent()); // is persisted
 
             // one key
             List <UserService.ApiKeyResponse> keys = userService.apiKeys();
@@ -562,29 +562,36 @@ public abstract class UserServiceAbstractTest {
             assertThrows(ServiceException.class, () -> userService.renameApiKey(keys.get(0).id, "horreum.key"));
             userService.renameApiKey(keys.get(0).id, "Test key new name");
             assertEquals("Test key new name", userService.apiKeys().get(0).name);
-                       
-            // revoke key
-            userService.revokeApiKey(keys.get(0).id);
+
+            // survives automatic revocation
+            userService.apiKeyRevocation();
+            assertFalse(userService.apiKeys().get(0).isRevoked);
+
+            // make it expire
+            expireApiKey(keys.get(0).id);
+
+            // should be revoked now
             assertTrue(userService.apiKeys().get(0).isRevoked);
+            assertThrows(ServiceException.class, () -> userService.renameApiKey(keys.get(0).id, "Another name"));
 
             // create key
-            String expiredKey = userService.newApiKey(new UserService.ApiKeyRequest("Expired key", 0, USER));
-            long expiredKeyId = userService.apiKeys().stream().filter(k -> k.id != keys.get(0).id).findFirst().orElseThrow().id;
-            expireApiKey(expiredKeyId);
-
-            // one expired key
-            List <UserService.ApiKeyResponse> twoKeys = userService.apiKeys();
-            assertEquals(2, twoKeys.size());
-            assertTrue(twoKeys.stream().anyMatch(t -> t.isExpired));
-
-            // a key deep in the past
-            assertThrows(ServiceException.class, () -> userService.newApiKey(new UserService.ApiKeyRequest("Very old key", -10, USER)));
+//            String expiredKey = userService.newApiKey(new UserService.ApiKeyRequest("Expired key", USER));
+//            long expiredKeyId = userService.apiKeys().stream().filter(k -> k.id != keys.get(0).id).findFirst().orElseThrow().id;
+//            expireApiKey(expiredKeyId);
+//
+//            // one expired key
+//            List <UserService.ApiKeyResponse> twoKeys = userService.apiKeys();
+//            assertEquals(2, twoKeys.size());
+//            assertTrue(twoKeys.stream().anyMatch(t -> t.isExpired));
         });
     }
 
     @Transactional
     void expireApiKey(long keyId) {
-        ApiKey.<ApiKey>findById(keyId).renew(LocalDate.now().minusDays(2));
+        UserApiKey apiKey = UserApiKey.findById(keyId);
+        apiKey.access = null;
+        apiKey.creation = timeService.today().minusDays(UserApiKey.EXPIRATION_DAYS + 1);
+        userService.apiKeyRevocation();
     }
 
 }

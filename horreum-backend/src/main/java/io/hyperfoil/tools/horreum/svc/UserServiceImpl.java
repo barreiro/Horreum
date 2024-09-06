@@ -1,7 +1,7 @@
 package io.hyperfoil.tools.horreum.svc;
 
 import io.hyperfoil.tools.horreum.api.internal.services.UserService;
-import io.hyperfoil.tools.horreum.entity.user.ApiKey;
+import io.hyperfoil.tools.horreum.entity.user.UserApiKey;
 import io.hyperfoil.tools.horreum.entity.user.UserInfo;
 import io.hyperfoil.tools.horreum.server.WithRoles;
 import io.hyperfoil.tools.horreum.svc.user.UserBackEnd;
@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 
+import static io.hyperfoil.tools.horreum.entity.user.UserApiKey.EXPIRATION_DAYS;
 import static java.text.MessageFormat.format;
 import static java.util.Collections.emptyList;
 
@@ -256,20 +257,15 @@ public class UserServiceImpl implements UserService {
     @WithRoles(addUsername = true)
     @Override public String newApiKey(ApiKeyRequest request) {
         validateApiKeyName(request.name);
-        if (request.expiration < 0) {
-            throw ServiceException.badRequest("API key expiration time is negative");
-        } else if (request.expiration > 1000) {
-            throw ServiceException.badRequest("API key expiration time is too long");
-        }
         UserInfo userInfo = currentUser();
 
-        ApiKey newKey = new ApiKey(request, timeService.today());
+        UserApiKey newKey = new UserApiKey(request, timeService.today());
         newKey.user = userInfo;
         userInfo.apiKeys.add(newKey);
         newKey.persist();
         userInfo.persist();
 
-        Log.infov("{0} created API key \"{1}\" valid until {2}", getUsername(), request.name, timeService.today().plusDays(request.expiration));
+        Log.infov("{0} created API key \"{1}\"", getUsername(), request.name);
         return newKey.keyString();
     }
 
@@ -279,50 +275,44 @@ public class UserServiceImpl implements UserService {
         return currentUser().apiKeys.stream()
                                     .filter(t -> t.isAlive(timeService.today()))
                                     .sorted()
-                                    .map(ApiKey::toResponse)
+                                    .map(UserApiKey::toResponse)
                                     .toList();
-    }
-
-    @Transactional
-    @WithRoles(addUsername = true)
-    @Override public void revokeApiKey(long keyId) {
-        ApiKey key = ApiKey.<ApiKey>findByIdOptional(keyId).orElseThrow(() -> ServiceException.notFound(format("Key with id {0} not found", keyId)));
-        key.revoke(timeService.today());
-        Log.infov("{0} revoked API key \"{1}\"", getUsername(), key.name);
-    }
-
-    @Transactional
-    @WithRoles(addUsername = true)
-    @Override public void renewApiKey(long keyId, long expiration) {
-        if (expiration < 0) {
-            throw ServiceException.badRequest("Key expiration time is negative");
-        } else if (expiration > 100) {
-            throw ServiceException.badRequest("Key expiration time is too long");
-        }
-        ApiKey key = ApiKey.<ApiKey>findByIdOptional(keyId).orElseThrow(() -> ServiceException.notFound(format("Key with id {0} not found", keyId)));
-        key.renew(timeService.today().plusDays(expiration));
-        Log.infov("{0} renewed API key \"{1}\" until {2}", getUsername(), key.name, timeService.today().plusDays(expiration));
     }
 
     @Transactional
     @WithRoles(addUsername = true)
     @Override public void renameApiKey(long keyId, String newName) {
         validateApiKeyName(newName);
-        ApiKey key = ApiKey.<ApiKey>findByIdOptional(keyId).orElseThrow(() -> ServiceException.notFound(format("Key with id {0} not found", keyId)));
+        UserApiKey key = UserApiKey.<UserApiKey>findByIdOptional(keyId).orElseThrow(() -> ServiceException.notFound(format("Key with id {0} not found", keyId)));
+        if (key.revoked) {
+            throw ServiceException.badRequest("Can't rename revoked key");
+        }
         String oldName = key.name;
         key.name = newName;
         Log.infov("{0} renamed API key \"{1}\" to \"{2}\"", getUsername(), oldName, newName);
+    }
+
+    @Transactional
+    @WithRoles(addUsername = true)
+    @Override public void revokeApiKey(long keyId) {
+        UserApiKey key = UserApiKey.<UserApiKey>findByIdOptional(keyId).orElseThrow(() -> ServiceException.notFound(format("Key with id {0} not found", keyId)));
+        key.revoked = true;
+        Log.infov("{0} revoked API key \"{1}\"", getUsername(), key.name);
     }
 
     @PermitAll
     @Transactional
     @WithRoles(extras = Roles.HORREUM_SYSTEM)
     @Scheduled(every = "P1d") // daily
-    public void apiKeyNotifications() {
+    public void apiKeyDailyTask() {
         for (long expiration : List.of(7, 2, 1, 0, -1)) {
-            ApiKey.<ApiKey>stream("expiration = ?1 AND revoked = false", timeService.today().plusDays(expiration))
-                  .forEach(key -> notificationServiceimpl.notifyApiKeyExpiration(key, expiration));
+            UserApiKey.<UserApiKey>stream("#UserApiKey.access", timeService.today().minusDays(EXPIRATION_DAYS - expiration))
+                      .forEach(key -> notificationServiceimpl.notifyApiKeyExpiration(key, expiration));
         }
+        UserApiKey.<UserApiKey>stream("#UserApiKey.accessBefore", timeService.today().minusDays(EXPIRATION_DAYS)).forEach(key -> {
+            Log.infov("Revoked idle API key \"{1}\"", key.name);
+            key.revoked = true;
+        });
     }
 
     private void validateApiKeyName(String keyName) {
