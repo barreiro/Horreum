@@ -22,13 +22,17 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 
-import static io.hyperfoil.tools.horreum.entity.user.UserApiKey.EXPIRATION_DAYS;
 import static java.text.MessageFormat.format;
 import static java.util.Collections.emptyList;
 
 @Authenticated
 @ApplicationScoped
 public class UserServiceImpl implements UserService {
+
+    /**
+     * default number of days API keys remain active after key usage
+     */
+    public static final long DEFAULT_API_KEY_ACTIVE_DAYS = 30;
 
     private static final int RANDOM_PASSWORD_LENGTH = 15;
 
@@ -259,7 +263,7 @@ public class UserServiceImpl implements UserService {
         validateApiKeyName(request.name);
         UserInfo userInfo = currentUser();
 
-        UserApiKey newKey = new UserApiKey(request, timeService.today());
+        UserApiKey newKey = new UserApiKey(request, timeService.today(), DEFAULT_API_KEY_ACTIVE_DAYS);
         newKey.user = userInfo;
         userInfo.apiKeys.add(newKey);
         newKey.persist();
@@ -273,7 +277,7 @@ public class UserServiceImpl implements UserService {
     @WithRoles(extras = Roles.HORREUM_SYSTEM)
     @Override public List<ApiKeyResponse> apiKeys() {
         return currentUser().apiKeys.stream()
-                                    .filter(t -> t.isAlive(timeService.today()))
+                                    .filter(t -> t.isHidden(timeService.today()))
                                     .sorted()
                                     .map(UserApiKey::toResponse)
                                     .toList();
@@ -305,11 +309,13 @@ public class UserServiceImpl implements UserService {
     @WithRoles(extras = Roles.HORREUM_SYSTEM)
     @Scheduled(every = "P1d") // daily
     public void apiKeyDailyTask() {
-        for (long expiration : List.of(7, 2, 1, 0, -1)) {
-            UserApiKey.<UserApiKey>stream("#UserApiKey.access", timeService.today().minusDays(EXPIRATION_DAYS - expiration))
-                      .forEach(key -> notificationServiceimpl.notifyApiKeyExpiration(key, expiration));
+        // notifications of keys expired and about to expire
+        for (long toExpiration : List.of(7, 2, 1, 0, -1)) {
+            UserApiKey.<UserApiKey>stream("#UserApiKey.access", timeService.today().minusDays(toExpiration))
+                      .forEach(key -> notificationServiceimpl.notifyApiKeyExpiration(key, toExpiration));
         }
-        UserApiKey.<UserApiKey>stream("#UserApiKey.accessBefore", timeService.today().minusDays(EXPIRATION_DAYS)).forEach(key -> {
+        // revoke expired keys
+        UserApiKey.<UserApiKey>stream("#UserApiKey.accessBefore", timeService.today()).forEach(key -> {
             Log.infov("Revoked idle API key \"{1}\"", key.name);
             key.revoked = true;
         });

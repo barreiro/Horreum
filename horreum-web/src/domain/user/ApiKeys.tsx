@@ -27,6 +27,7 @@ export default function ApiKeys() {
         keys => setApiKeys(keys),
         error => alerting.dispatchError(error, "FETCH_API_KEYS", "Failed to fetch API keys for user")
     )
+    useEffect(() => void refreshApiKeys(), [])
 
     const [createApiKey, setCreateApiKey] = useState(false)
     const [newKeyName, setNewKeyName] = useState<string>()
@@ -74,29 +75,48 @@ export default function ApiKeys() {
 
     const keyStatus = (key: ApiKeyResponse) => {
         const labels = [];
-        if (key.isExpired) {
+        if (key.toExpiration || -1 < 0) {
             labels.push(<Label color="grey">Expired</Label>)
         } else if (key.isRevoked) {
             labels.push(<Label color="red">Revoked</Label>)
         } else {
-            labels.push(<Label color="green">Valid</Label>)
+            labels.push(<Label color="green">Active</Label>)
         }
-        if (key.expiration != null) {
-            if (key.expiration < 1) {
+        if (key.toExpiration != null) {
+            if (key.toExpiration < 1) {
                 labels.push(<Label color="orange">Expires TODAY</Label>)
-            } else if (key.expiration < 2) {
+            } else if (key.toExpiration < 2) {
                 labels.push(<Label color="orange">Expires TOMORROW</Label>)
-            } else if (key.expiration < 7) {
+            } else if (key.toExpiration < 7) {
                 labels.push(<Label color="gold">Expires in less than a week</Label>)
             }
         }
         return labels
     }
 
+    const performCreateApiKey = () => {
+        userApi.newApiKey({
+            name: newKeyName,
+            type: "USER"
+        })
+            .then((tokenValue) => {
+                setNewKeyValue(tokenValue)
+                void alerting.dispatchInfo("API_KEY_CREATED", "API key created", "API key was successfully created", 3000)
+            })
+            .catch(error => alerting.dispatchError(error, "API_KEY_NOT_CREATED", "Failed to create new API key"))
+            .finally(() => setCreateApiKey(false))
+            .then(() => void refreshApiKeys())
+    }
 
-    useEffect(() => {
-        void refreshApiKeys();
-    }, [])
+    const performRenameApiKey = () => {
+        if (renameKeyId) {
+            userApi.renameApiKey(renameKeyId, renameKeyName)
+                .then(() => void alerting.dispatchInfo("API_KEY_RENAMED", "API key renamed", "API key was successfully renamed", 3000))
+                .catch(error => alerting.dispatchError(error, "API_KEY_NOT_RENAMED", "Failed to rename API key"))
+                .finally(() => setRenameKeyId(undefined))
+                .then(() => void refreshApiKeys())
+        }
+    }
 
     return (
         <>
@@ -134,9 +154,7 @@ export default function ApiKeys() {
                                 <ActionsColumn items={[
                                     {
                                         title: 'Rename',
-                                        onClick: () => {
-                                            setRenameKeyId(key.id)
-                                        }
+                                        onClick: () => setRenameKeyId(key.id)
                                     },
                                     {
                                         title: 'Revoke',
@@ -166,23 +184,7 @@ export default function ApiKeys() {
                 variant="small"
                 onClose={() => setCreateApiKey(false)}
                 actions={[
-                    <Button
-                        onClick={() => {
-                            userApi.newApiKey({
-                                name: newKeyName,
-                                type: "USER"
-                            })
-                                .then((tokenValue) => {
-                                    setNewKeyValue(tokenValue)
-                                    void alerting.dispatchInfo("API_KEY_CREATED", "API key created", "API key was successfully created", 3000)
-                                })
-                                .catch(error => alerting.dispatchError(error, "API_KEY_NOT_CREATED", "Failed to create new API key"))
-                                .finally(() => setCreateApiKey(false))
-                                .then(() => void refreshApiKeys())
-                        }}
-                    >
-                        Create
-                    </Button>,
+                    <Button onClick={performCreateApiKey}>Create</Button>,
                     <Button variant="secondary" onClick={() => setCreateApiKey(false)}>Cancel</Button>,
                 ]}
             >
@@ -214,19 +216,7 @@ export default function ApiKeys() {
                 variant="small"
                 onClose={() => setRenameKeyId(undefined)}
                 actions={[
-                    <Button
-                        onClick={() => {
-                            if (renameKeyId) {
-                                userApi.renameApiKey(renameKeyId, renameKeyName)
-                                    .then(() => void alerting.dispatchInfo("API_KEY_RENAMED", "API key renamed", "API key was successfully renamed", 3000))
-                                    .catch(error => alerting.dispatchError(error, "API_KEY_NOT_RENAMED", "Failed to rename API key"))
-                                    .finally(() => setRenameKeyId(undefined))
-                                    .then(() => void refreshApiKeys())
-                            }
-                        }}
-                    >
-                        Rename
-                    </Button>,
+                    <Button onClick={performRenameApiKey}>Rename</Button>,
                     <Button variant="secondary" onClick={() => setRenameKeyId(undefined)}>Cancel</Button>,
                 ]}>
                 <Form isHorizontal>

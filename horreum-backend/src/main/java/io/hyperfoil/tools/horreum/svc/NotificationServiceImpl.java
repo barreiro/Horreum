@@ -195,9 +195,9 @@ public class NotificationServiceImpl implements NotificationService {
       NotificationSettingsDAO.<NotificationSettingsDAO>stream("name", key.user.username).forEach(notification -> {
          NotificationPlugin plugin = plugins.get(notification.method);
          if (plugin == null) {
-            log.errorf("Cannot notify %s of API key expiration: no plugin for method %s", notification.name, notification.method);
+            log.errorf("Cannot notify %s of API key \"%s\" expiration: no plugin for method %s", notification.name, key.name, notification.method);
          } else {
-            plugin.create(notification.name, notification.data).notifyApiKeyExpiration(key.name, key.creation, key.access, toExpiration);
+            plugin.create(notification.name, notification.data).notifyApiKeyExpiration(key.name, key.creation, key.access, toExpiration, key.valid);
          }
       });
    }

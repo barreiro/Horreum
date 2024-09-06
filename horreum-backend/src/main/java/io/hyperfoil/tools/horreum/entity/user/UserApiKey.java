@@ -36,12 +36,9 @@ import static jakarta.persistence.GenerationType.SEQUENCE;
 })
 public class UserApiKey extends PanacheEntityBase implements Comparable<UserApiKey> {
 
-    // number of days the key can remain unused before it expires
-    public static long EXPIRATION_DAYS = 30;
-
     // old authentication tokens are not listed and can't be renewed either
     // they are kept around to prevent re-use
-    public static long DEATH_ROW_DAYS = 7;
+    public static long HIDE_AFTER_DAYS = 7;
 
     private static MessageDigest digest;
 
@@ -78,6 +75,8 @@ public class UserApiKey extends PanacheEntityBase implements Comparable<UserApiK
 
     public LocalDate creation, access;
 
+    public long valid; // number of days after last access that the key remains valid
+
     public boolean revoked;
 
     public UserApiKey() {
@@ -87,25 +86,26 @@ public class UserApiKey extends PanacheEntityBase implements Comparable<UserApiK
         type = UserService.KeyType.USER;
     }
 
-    public UserApiKey(UserService.ApiKeyRequest request, LocalDate creation) {
-        this(request.name, request.type, creation);
+    public UserApiKey(UserService.ApiKeyRequest request, LocalDate creation, long valid) {
+        this(request.name, request.type, creation, valid);
     }
 
-    public UserApiKey(String name, UserService.KeyType type, LocalDate creationDate) {
+    public UserApiKey(String name, UserService.KeyType type, LocalDate creationDate, long valid) {
         randomnessSource = UUID.randomUUID();
         this.name = name;
         this.type = type;
+        this.valid = valid;
         hash = computeHash(keyString());
         creation = creationDate;
         revoked = false;
     }
 
-    public boolean isAlive(LocalDate givenDay) {
-        return givenDay.isBefore((access == null ? creation : access).plusDays(EXPIRATION_DAYS + DEATH_ROW_DAYS));
+    public boolean isHidden(LocalDate givenDay) {
+        return givenDay.isBefore((access == null ? creation : access).plusDays(valid + HIDE_AFTER_DAYS));
     }
 
     private long toExpiration(LocalDate givenDay) {
-        return EXPIRATION_DAYS - ChronoUnit.DAYS.between(access == null ? creation : access, givenDay);
+        return valid - ChronoUnit.DAYS.between(access == null ? creation : access, givenDay);
     }
 
     // --- //
@@ -161,8 +161,7 @@ public class UserApiKey extends PanacheEntityBase implements Comparable<UserApiK
         response.creation = creation;
         response.access = access;
         response.isRevoked = revoked;
-        response.expiration = toExpiration(LocalDate.now());
-        response.isExpired = response.expiration < 0;
+        response.toExpiration = toExpiration(LocalDate.now());
         return response;
     }
 

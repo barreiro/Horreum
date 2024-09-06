@@ -197,8 +197,7 @@ public interface UserService {
       public KeyType type;
       public LocalDate creation;
       public LocalDate access;
-      public boolean isExpired;
       public boolean isRevoked;
-      public long expiration;
+      public long toExpiration;
    }
 }

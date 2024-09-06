@@ -555,7 +555,7 @@ public abstract class UserServiceAbstractTest {
             // one key
             List <UserService.ApiKeyResponse> keys = userService.apiKeys();
             assertEquals(1, keys.size());
-            assertFalse(keys.get(0).isExpired);
+            assertEquals(UserServiceImpl.DEFAULT_API_KEY_ACTIVE_DAYS, keys.get(0).toExpiration);
             assertFalse(keys.get(0).isRevoked);
 
             // rename key
@@ -564,7 +564,7 @@ public abstract class UserServiceAbstractTest {
             assertEquals("Test key new name", userService.apiKeys().get(0).name);
 
             // survives automatic revocation
-            userService.apiKeyRevocation();
+            userService.apiKeyDailyTask();
             assertFalse(userService.apiKeys().get(0).isRevoked);
 
             // make it expire
@@ -590,8 +590,8 @@ public abstract class UserServiceAbstractTest {
     void expireApiKey(long keyId) {
         UserApiKey apiKey = UserApiKey.findById(keyId);
         apiKey.access = null;
-        apiKey.creation = timeService.today().minusDays(UserApiKey.EXPIRATION_DAYS + 1);
-        userService.apiKeyRevocation();
+        apiKey.creation = timeService.today().minusDays(UserServiceImpl.DEFAULT_API_KEY_ACTIVE_DAYS + 1);
+        userService.apiKeyDailyTask();
     }
 
 }
