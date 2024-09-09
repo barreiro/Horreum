@@ -21,6 +21,7 @@ import jakarta.ws.rs.core.Response;
 import org.jboss.logging.Logger;
 import org.junit.jupiter.api.Test;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -28,6 +29,7 @@ import java.util.Map;
 import java.util.Set;
 
 import static io.hyperfoil.tools.horreum.api.internal.services.UserService.KeyType.USER;
+import static io.hyperfoil.tools.horreum.svc.UserServiceImpl.DEFAULT_API_KEY_ACTIVE_DAYS;
 import static io.restassured.RestAssured.given;
 import static org.apache.http.HttpStatus.SC_OK;
 import static org.apache.http.HttpStatus.SC_UNAUTHORIZED;
@@ -555,43 +557,38 @@ public abstract class UserServiceAbstractTest {
             // one key
             List <UserService.ApiKeyResponse> keys = userService.apiKeys();
             assertEquals(1, keys.size());
-            assertEquals(UserServiceImpl.DEFAULT_API_KEY_ACTIVE_DAYS, keys.get(0).toExpiration);
+            assertEquals(DEFAULT_API_KEY_ACTIVE_DAYS, keys.get(0).toExpiration);
             assertFalse(keys.get(0).isRevoked);
 
             // rename key
             assertThrows(ServiceException.class, () -> userService.renameApiKey(keys.get(0).id, "horreum.key"));
-            userService.renameApiKey(keys.get(0).id, "Test key new name");
-            assertEquals("Test key new name", userService.apiKeys().get(0).name);
+            userService.renameApiKey(keys.get(0).id, "Key with new name");
+            assertEquals("Key with new name", userService.apiKeys().get(0).name);
 
-            // survives automatic revocation
-            userService.apiKeyDailyTask();
+            // the system can find the key by its expiration day
+            assertTrue(UserApiKey.<UserApiKey>stream("#UserApiKey.expire", timeService.today().plusDays(DEFAULT_API_KEY_ACTIVE_DAYS)).anyMatch(k -> k.id == keys.get(0).id));
+
+            // about to expire
+            setApiKeyCreation(keys.get(0).id, timeService.today().minusDays(DEFAULT_API_KEY_ACTIVE_DAYS));
+
+            // should not be revoked yet
             assertFalse(userService.apiKeys().get(0).isRevoked);
+            assertTrue(UserApiKey.<UserApiKey>stream("#UserApiKey.expire", timeService.today()).anyMatch(k -> k.id == keys.get(0).id));
 
-            // make it expire
-            expireApiKey(keys.get(0).id);
+            // expire it
+            setApiKeyCreation(keys.get(0).id, timeService.today().minusDays(DEFAULT_API_KEY_ACTIVE_DAYS + 1));
 
             // should be revoked now
             assertTrue(userService.apiKeys().get(0).isRevoked);
-            assertThrows(ServiceException.class, () -> userService.renameApiKey(keys.get(0).id, "Another name"));
-
-            // create key
-//            String expiredKey = userService.newApiKey(new UserService.ApiKeyRequest("Expired key", USER));
-//            long expiredKeyId = userService.apiKeys().stream().filter(k -> k.id != keys.get(0).id).findFirst().orElseThrow().id;
-//            expireApiKey(expiredKeyId);
-//
-//            // one expired key
-//            List <UserService.ApiKeyResponse> twoKeys = userService.apiKeys();
-//            assertEquals(2, twoKeys.size());
-//            assertTrue(twoKeys.stream().anyMatch(t -> t.isExpired));
+            assertThrows(ServiceException.class, () -> userService.renameApiKey(keys.get(0).id, "Rename revoked key should throw"));
         });
     }
 
     @Transactional
-    void expireApiKey(long keyId) {
+    void setApiKeyCreation(long keyId, LocalDate creation) {
         UserApiKey apiKey = UserApiKey.findById(keyId);
         apiKey.access = null;
-        apiKey.creation = timeService.today().minusDays(UserServiceImpl.DEFAULT_API_KEY_ACTIVE_DAYS + 1);
+        apiKey.creation = creation;
         userService.apiKeyDailyTask();
     }
-
 }

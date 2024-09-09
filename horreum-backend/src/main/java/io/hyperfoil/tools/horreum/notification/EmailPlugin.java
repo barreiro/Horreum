@@ -144,7 +144,7 @@ public class EmailPlugin implements NotificationPlugin {
          log.debug("Sending mail: "+content);
       }
 
-      @Override public void notifyApiKeyExpiration(String keyName, LocalDate creation, LocalDate lastAccess, long toExpiration, long valid) {
+      @Override public void notifyApiKeyExpiration(String keyName, LocalDate creation, LocalDate lastAccess, long toExpiration, long active) {
          String subject = String.format("%s API key \"%s\" %s", subjectPrefix, keyName, toExpiration == -1 ? "EXPIRED" : "about to expire");
          String content = apiKeyExpirationEmail
                  .data("baseUrl", baseUrl)
@@ -153,7 +153,7 @@ public class EmailPlugin implements NotificationPlugin {
                  .data("creation", creation)
                  .data("lastAccess", lastAccess)
                  .data("expiration", toExpiration)
-                 .data("valid", valid)
+                 .data("active", active)
                  .render();
          mailer.send(Mail.withHtml(data, subject, content)).await().atMost(sendMailTimeout);
          log.debug("Sending mail: "+content);

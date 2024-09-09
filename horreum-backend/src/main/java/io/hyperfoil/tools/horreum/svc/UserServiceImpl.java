@@ -260,7 +260,7 @@ public class UserServiceImpl implements UserService {
     @Transactional
     @WithRoles(addUsername = true)
     @Override public String newApiKey(ApiKeyRequest request) {
-        validateApiKeyName(request.name);
+        validateApiKeyName(request.name == null ? "" : request.name);
         UserInfo userInfo = currentUser();
 
         UserApiKey newKey = new UserApiKey(request, timeService.today(), DEFAULT_API_KEY_ACTIVE_DAYS);
@@ -269,7 +269,7 @@ public class UserServiceImpl implements UserService {
         newKey.persist();
         userInfo.persist();
 
-        Log.infov("{0} created API key \"{1}\"", getUsername(), request.name);
+        Log.infov("{0} created API key \"{1}\"", getUsername(), request.name == null ? "" : request.name);
         return newKey.keyString();
     }
 
@@ -277,7 +277,7 @@ public class UserServiceImpl implements UserService {
     @WithRoles(extras = Roles.HORREUM_SYSTEM)
     @Override public List<ApiKeyResponse> apiKeys() {
         return currentUser().apiKeys.stream()
-                                    .filter(t -> t.isHidden(timeService.today()))
+                                    .filter(t -> !t.isArchived(timeService.today()))
                                     .sorted()
                                     .map(UserApiKey::toResponse)
                                     .toList();
@@ -286,14 +286,14 @@ public class UserServiceImpl implements UserService {
     @Transactional
     @WithRoles(addUsername = true)
     @Override public void renameApiKey(long keyId, String newName) {
-        validateApiKeyName(newName);
+        validateApiKeyName(newName == null ? "" : newName);
         UserApiKey key = UserApiKey.<UserApiKey>findByIdOptional(keyId).orElseThrow(() -> ServiceException.notFound(format("Key with id {0} not found", keyId)));
         if (key.revoked) {
             throw ServiceException.badRequest("Can't rename revoked key");
         }
         String oldName = key.name;
-        key.name = newName;
-        Log.infov("{0} renamed API key \"{1}\" to \"{2}\"", getUsername(), oldName, newName);
+        key.name = newName == null ? "" : newName;
+        Log.infov("{0} renamed API key \"{1}\" to \"{2}\"", getUsername(), oldName, newName == null ? "" : newName);
     }
 
     @Transactional
@@ -307,16 +307,16 @@ public class UserServiceImpl implements UserService {
     @PermitAll
     @Transactional
     @WithRoles(extras = Roles.HORREUM_SYSTEM)
-    @Scheduled(every = "P1d") // daily
+    @Scheduled(every = "P1d") // daily -- it may lag up tp 24h compared to the actual date, but keys are revoked 24h after notification
     public void apiKeyDailyTask() {
-        // notifications of keys expired and about to expire
+        // notifications of keys expired and about to expire -- hardcoded to send multiple notices in the week prior to expiration
         for (long toExpiration : List.of(7, 2, 1, 0, -1)) {
-            UserApiKey.<UserApiKey>stream("#UserApiKey.access", timeService.today().minusDays(toExpiration))
+            UserApiKey.<UserApiKey>stream("#UserApiKey.expire", timeService.today().plusDays(toExpiration))
                       .forEach(key -> notificationServiceimpl.notifyApiKeyExpiration(key, toExpiration));
         }
-        // revoke expired keys
-        UserApiKey.<UserApiKey>stream("#UserApiKey.accessBefore", timeService.today()).forEach(key -> {
-            Log.infov("Revoked idle API key \"{1}\"", key.name);
+        // revoke expired keys -- could be done directly in the DB but iterate instead to be able to log
+        UserApiKey.<UserApiKey>stream("#UserApiKey.pastExpiration", timeService.today()).forEach(key -> {
+            Log.infov("Revoked idle API key \"{0}\"", key.name);
             key.revoked = true;
         });
     }

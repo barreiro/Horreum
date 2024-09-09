@@ -167,9 +167,7 @@ public interface UserService {
       public String password;
       public String team;
       public List<String> roles;
-   }
-
-   // --- //
+   } 
 
    /**
     * Key type allows the access to be scoped. 

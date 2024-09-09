@@ -75,20 +75,20 @@ export default function ApiKeys() {
 
     const keyStatus = (key: ApiKeyResponse) => {
         const labels = [];
-        if (key.toExpiration || -1 < 0) {
-            labels.push(<Label color="grey">Expired</Label>)
+        if (key.toExpiration != null && key.toExpiration < 0) {
+            labels.push(<Label key="status" color="grey">Expired</Label>)
         } else if (key.isRevoked) {
-            labels.push(<Label color="red">Revoked</Label>)
+            labels.push(<Label key="status" color="red">Revoked</Label>)
         } else {
-            labels.push(<Label color="green">Active</Label>)
+            labels.push(<Label key="status" color="green">Active</Label>)
         }
-        if (key.toExpiration != null) {
+        if (key.toExpiration != null && key.toExpiration >= 0) {
             if (key.toExpiration < 1) {
-                labels.push(<Label color="orange">Expires TODAY</Label>)
+                labels.push(<Label key="expiration" color="orange">Expires TODAY</Label>)
             } else if (key.toExpiration < 2) {
-                labels.push(<Label color="orange">Expires TOMORROW</Label>)
+                labels.push(<Label key="expiration" color="orange">Expires TOMORROW</Label>)
             } else if (key.toExpiration < 7) {
-                labels.push(<Label color="gold">Expires in less than a week</Label>)
+                labels.push(<Label key="expiration" color="gold">Expires in less than a week</Label>)
             }
         }
         return labels
@@ -131,11 +131,11 @@ export default function ApiKeys() {
                     </Tr>
                 </Thead>
                 <Tbody>
-                    {apiKeys.map((key, i) => (
-                        <Tr key={`key-${i}`}>
+                    {apiKeys.map((key) => (
+                        <Tr key={`key-${key.id}`}>
                             <Td dataLabel="name">{key.name}</Td>
                             <Td dataLabel="type" textCenter>
-                                <Tooltip trigger="mouseenter" content={keyTypeTooltip(key)} isVisible={key.type != null}>
+                                <Tooltip trigger="mouseenter" content={keyTypeTooltip(key)}>
                                     <span>{key.type}</span>
                                 </Tooltip>
                             </Td>
@@ -145,7 +145,7 @@ export default function ApiKeys() {
                                 </Tooltip>
                             </Td>
                             <Td dataLabel="access" textCenter>
-                                <Tooltip trigger="mouseenter" content={keyAccessTooltip(key)} isVisible={key.access != null}>
+                                <Tooltip trigger="mouseenter" content={keyAccessTooltip(key)}>
                                     <span>{key.access?.toLocaleDateString() || <Label color="cyan">Never used</Label>}</span>
                                 </Tooltip>
                             </Td>
@@ -184,13 +184,13 @@ export default function ApiKeys() {
                 variant="small"
                 onClose={() => setCreateApiKey(false)}
                 actions={[
-                    <Button onClick={performCreateApiKey}>Create</Button>,
-                    <Button variant="secondary" onClick={() => setCreateApiKey(false)}>Cancel</Button>,
+                    <Button key="submit" onClick={performCreateApiKey}>Create</Button>,
+                    <Button key="cancel" variant="secondary" onClick={() => setCreateApiKey(false)}>Cancel</Button>,
                 ]}
             >
                 <Form isHorizontal>
-                    <FormGroup isRequired label="Key name" fieldId="new-api-key-name">
-                        <TextInput isRequired onChange={(_, val) => setNewKeyName(val)}/>
+                    <FormGroup label="Key name" fieldId="new-api-key-name">
+                        <TextInput aria-label="new-api-key-name" onChange={(_, val) => setNewKeyName(val)}/>
                     </FormGroup>
                 </Form>
             </Modal>
@@ -200,14 +200,12 @@ export default function ApiKeys() {
                 aria-label="new-api-key"
                 variant="small"
                 onClose={() => setNewKeyValue(undefined)}>
-                footer={
+                <ClipboardCopy isReadOnly>{newKeyValue}</ClipboardCopy>
                 <HelperText>
                     <HelperTextItem variant="warning" hasIcon>
                         This is the only time you'll be able to see the key
                     </HelperTextItem>
                 </HelperText>
-            }
-                <ClipboardCopy isReadOnly>{newKeyValue}</ClipboardCopy>
             </Modal>
             <Modal
                 isOpen={renameKeyId != undefined}
@@ -216,12 +214,12 @@ export default function ApiKeys() {
                 variant="small"
                 onClose={() => setRenameKeyId(undefined)}
                 actions={[
-                    <Button onClick={performRenameApiKey}>Rename</Button>,
-                    <Button variant="secondary" onClick={() => setRenameKeyId(undefined)}>Cancel</Button>,
+                    <Button key="submit" onClick={performRenameApiKey}>Rename</Button>,
+                    <Button key="cancel" variant="secondary" onClick={() => setRenameKeyId(undefined)}>Cancel</Button>,
                 ]}>
                 <Form isHorizontal>
-                    <FormGroup isRequired label="Key name" fieldId="rennew-api-key-name">
-                        <TextInput isRequired onChange={(_, val) => setRenameKeyName(val)}/>
+                    <FormGroup label="Key name" fieldId="rename-api-key-name">
+                        <TextInput aria-label="rename-api-key-name" onChange={(_, val) => setRenameKeyName(val)}/>
                     </FormGroup>
                 </Form>
             </Modal>

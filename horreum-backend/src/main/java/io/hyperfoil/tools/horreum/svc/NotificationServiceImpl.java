@@ -197,7 +197,7 @@ public class NotificationServiceImpl implements NotificationService {
          if (plugin == null) {
             log.errorf("Cannot notify %s of API key \"%s\" expiration: no plugin for method %s", notification.name, key.name, notification.method);
          } else {
-            plugin.create(notification.name, notification.data).notifyApiKeyExpiration(key.name, key.creation, key.access, toExpiration, key.valid);
+            plugin.create(notification.name, notification.data).notifyApiKeyExpiration(key.name, key.creation, key.access, toExpiration, key.active);
          }
       });
    }

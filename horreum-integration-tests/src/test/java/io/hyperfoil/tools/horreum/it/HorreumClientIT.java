@@ -81,7 +81,7 @@ public class HorreumClientIT implements QuarkusTestBeforeTestExecutionCallback, 
 
             UserService.ApiKeyResponse apiKey = horreumClient.userService.apiKeys().get(0);
             assertFalse(apiKey.isRevoked);
-            assertFalse(apiKey.isExpired);
+            assertFalse(apiKey.toExpiration < 0);
             assertEquals(LocalDate.now(), apiKey.creation);
             assertEquals(LocalDate.now(), apiKey.access);
             assertEquals(USER, apiKey.type);
