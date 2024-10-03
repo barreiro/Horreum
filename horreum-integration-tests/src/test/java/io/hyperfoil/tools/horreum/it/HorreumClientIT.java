@@ -434,12 +434,12 @@ public class HorreumClientIT implements QuarkusTestBeforeTestExecutionCallback, 
 
         adminClient.userService.addTeam(TEST_TEAM);
 
-        // create machine account to be used throughout the test
+        // create account to be used throughout the test
         UserService.NewUser testUser = new UserService.NewUser();
         testUser.user = new UserService.UserData("", TEST_USERNAME, "Test", "User", "test@example.com");
         testUser.team = TEST_TEAM;
         testUser.password = TEST_PASSWORD;
-        testUser.roles = List.of(Roles.MACHINE, Roles.TESTER, Roles.UPLOADER);
+        testUser.roles = List.of(Roles.TESTER, Roles.UPLOADER);
         adminClient.userService.createUser(testUser);
 
         adminClient.close();

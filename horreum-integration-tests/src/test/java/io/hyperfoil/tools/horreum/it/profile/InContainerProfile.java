@@ -14,7 +14,7 @@ public class InContainerProfile implements QuarkusTestProfile {
                 "quarkus.datasource.migration.jdbc.url", "jdbc:postgresql://172.17.0.1:5432/horreum",
 
                 // uncomment the following to test authentication with Horreum instead of Keycloak
-                // "horreum.roles.provider", "database",
+                "horreum.roles.provider", "database",
 
                 // disable certificate validation (but still require a SSL connection)
                 "quarkus.datasource.jdbc.additional-jdbc-properties.sslmode", "require");
