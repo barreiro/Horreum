@@ -1199,9 +1199,7 @@ public class RunServiceImpl implements RunService {
         // We need to make sure all old datasets are gone before creating new; otherwise we could
         // break the runid,ordinal uniqueness constraint
         for (DatasetDAO old : DatasetDAO.<DatasetDAO> list("runId", runId)) {
-            for (DataPointDAO dp : DataPointDAO.<DataPointDAO> list("dataset.id", old.getInfo().id)) {
-                dp.delete();
-            }
+            DataPointDAO.delete("dataset.id", old.getInfo().id);
             mediator.propagatedDatasetDelete(old.id);
         }
 
